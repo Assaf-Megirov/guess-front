@@ -22,7 +22,7 @@ interface UserCardProps {
 const UserCard: React.FC<UserCardProps> = ({ user, isFriend, imageUrl }) => {
 
   const {token} = useAuth();
-  const {triggerFriendsListUpdate} = useSocial();
+  const {triggerFriendsListUpdate, sendInvite} = useSocial();
 
   const handleAddToFriends = async () => {
     try {
@@ -70,6 +70,10 @@ const UserCard: React.FC<UserCardProps> = ({ user, isFriend, imageUrl }) => {
     }
   };
 
+  const handleInviteToGame = async () => {
+    sendInvite(user.id);
+  }
+
   return (
     <div className="flex items-center border border-gray-300 rounded-lg p-4 max-w-md shadow-md bg-white">
       {imageUrl ? (
@@ -98,7 +102,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, isFriend, imageUrl }) => {
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!user.isOnline}
-                onClick={() => alert('Invite to game feature not implemented yet.')}
+                onClick={handleInviteToGame}
               >
                 Invite to Game
               </DropdownMenuItem>

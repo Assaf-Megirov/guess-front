@@ -32,6 +32,11 @@ const Sidebar: React.FC = () => {
                 Outgoing friend requests
               </Link>
             </li>
+            <li>
+              <Link to="/gameInvites" className="block px-4 py-2 rounded hover:bg-gray-700">
+                Incoming game invites
+              </Link>
+            </li>
           </ul>
         </nav>
         <div className="p-4 border-t border-gray-700">
