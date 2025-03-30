@@ -79,14 +79,31 @@ function AuthRedirect() {
 
 function GameRedirect() {
   const navigate = useNavigate();
+  const { user, isInitialized } = useAuth();
   const { registerGameInit, unregisterGameInit, registerGameInvite, unregisterGameInvite, acceptInvite} = useSocial();
   const { setGameData, gameInitToGameData } = useGame();
+
+  useEffect(() => {
+    console.log('User state changed in GameRedirect:', JSON.stringify(user));
+  }, [user]);
 
   const handleGameInit = (data: GameInit) => {
     console.log('game init in App.tsx');
     console.log('Data recieved:', data);
+    console.log('Current user state:', JSON.stringify(user));
+    console.log('Auth initialized:', isInitialized);
 
-    try{
+    if (!isInitialized) {
+      console.log('Auth not initialized yet, waiting...');
+      return;
+    }
+
+    if (!user) {
+      console.error('Cannot initialize game: User is not logged in');
+      return;
+    }
+
+    try {
       const gData = gameInitToGameData(data);
       console.log('Game data created:', gData);
       setGameData(gData);
@@ -109,13 +126,18 @@ function GameRedirect() {
         });
       }, 1);
       console.log('Toast method called');
-    }catch (error) {
+    } catch (error) {
       console.error('Error in handleGameInit:', error);
+      toast.error('Failed to initialize game. Please try again.');
     }
-
   };
 
   const handleGameInvite = (userId: string, username: string) => {
+    if (!isInitialized) {
+      console.log('Auth not initialized yet, ignoring game invite');
+      return;
+    }
+
     toast(`Recieved game invite from: ${username}`, {
       duration: 0,
       action: (
@@ -133,6 +155,11 @@ function GameRedirect() {
   }
 
   useEffect(() => {
+    if (!isInitialized) {
+      console.log('Auth not initialized yet, not registering callbacks');
+      return;
+    }
+
     registerGameInit(handleGameInit);
     registerGameInvite(handleGameInvite);
     console.log('In game redirect registering to the game init and game invite callback');
@@ -140,7 +167,7 @@ function GameRedirect() {
       unregisterGameInit(handleGameInit);
       unregisterGameInvite(handleGameInvite);
     }
-  }, [registerGameInit]);
+  }, [registerGameInit, isInitialized]);
   
   return null;
 }

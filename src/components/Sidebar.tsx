@@ -10,7 +10,7 @@ const Sidebar: React.FC = () => {
       <div
         className={`fixed inset-y-0 left-0 bg-gray-800 text-white w-64 transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } transition-transform duration-300 lg:translate-x-0`}
+        } transition-transform duration-300 `}
       >
         <div className="p-4 text-lg font-bold border-b border-gray-700">
           My App
@@ -50,7 +50,7 @@ const Sidebar: React.FC = () => {
       <button
         className={`fixed top-4 left-0 transform ${
           isOpen ? 'translate-x-64' : 'translate-x-0'
-        } transition-transform duration-300 z-50 p-2 bg-gray-700 text-white rounded-r-lg shadow-lg lg:hidden`}
+        } transition-transform duration-300 z-50 p-2 bg-gray-700 text-white rounded-r-lg shadow-lg`}
         onClick={() => setIsOpen(!isOpen)}
       >
         <svg
