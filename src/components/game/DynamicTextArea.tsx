@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, use } from 'react';
 
 interface DynamicTextareaProps {
     disabled: boolean;
@@ -62,12 +62,7 @@ const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onCh
         }else{
           //if its not a valid move
           //underline the text in red until next change
-          if (textAreaRef.current) {
-              textAreaRef.current.style.textDecoration = 'underline';
-              textAreaRef.current.style.textDecorationColor = 'red';
-              textAreaRef.current.style.textDecorationThickness = '2px';
-              setInvalidWord(true);
-          }
+          setInvalidWord(true);
         }
       }
     }
@@ -88,6 +83,7 @@ const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onCh
         if (textAreaRef.current) {
             textAreaRef.current.value = newValue;
         }
+        setInvalidWord(false);
         return;
       }
 
@@ -99,6 +95,7 @@ const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onCh
         if (textAreaRef.current) {
             textAreaRef.current.value = newValue;
         }
+        setInvalidWord(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -119,8 +116,23 @@ const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onCh
     setInvalidWord(false);
   }, [internalValue]);
 
+  useEffect(() => {
+    if(invalidWord){
+      if (textAreaRef.current) {
+          textAreaRef.current.style.textDecoration = 'underline';
+          textAreaRef.current.style.textDecorationColor = 'red';
+          textAreaRef.current.style.textDecorationThickness = '2px';
+      }
+    }else{
+      if (textAreaRef.current) {
+          textAreaRef.current.style.textDecoration = 'none';
+      }
+    }
+  }, [invalidWord]);
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setinternalValue(e.target.value);
+    setInvalidWord(false);
   }
 
   return (
