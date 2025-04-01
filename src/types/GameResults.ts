@@ -3,7 +3,7 @@ export interface GameResults{
     elapsedTime: number;
     winner: string;
     scores: {
-        [key: string]: number;
+        [key: string]: {points: number, username: string};
     };
 }
 

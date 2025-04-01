@@ -9,6 +9,7 @@ export interface GameState {
       letters: string;
       written: string;
       words: string[];
+      username: string;
     }>;
     elapsedTime: number;
   }

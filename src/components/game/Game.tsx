@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import DynamicTextarea from './DynamicTextArea';
-import { InvalidMoveResponse, MoveResponse, useGame } from '@/contexts/GameContext';
+import { InvalidMoveResponse, MoveResponse, useGame, ValidMoveResponse } from '@/contexts/GameContext';
 import { GameState } from '@/types/GameState';
 import { useAuth } from '@/contexts/AuthContext';
 import { GameResults } from '@/types/GameResults';
@@ -13,19 +13,20 @@ interface PlayerData {
   letters: string;
   written: string;
   words: string[];
+  previousRank?: number;
+  currentRank?: number;
 }
 
 interface AnimationState {
-  player: {
+  [playerId: string]: {
     valid: boolean;
     invalid: boolean;
     points: boolean;
   };
-  opponent: {
-    valid: boolean;
-    invalid: boolean;
-    points: boolean;
-  };
+}
+
+interface PlayerError {
+  [playerId: string]: string | null;
 }
 
 const Game: React.FC = () => {
@@ -33,12 +34,9 @@ const Game: React.FC = () => {
   const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const [results, setResults] = useState<GameResults | null>(null);
-  const [playerError, setPlayerError] = useState<string | null>(null);
-  const [opponentError, setOpponentError] = useState<string | null>(null);
-  const [animation, setAnimation] = useState<AnimationState>({
-    player: { valid: false, invalid: false, points: false },
-    opponent: { valid: false, invalid: false, points: false },
-  });
+  const [playerErrors, setPlayerErrors] = useState<PlayerError>({});
+  const [animation, setAnimation] = useState<AnimationState>({});
+  const [rankChanges, setRankChanges] = useState<{[playerId: string]: 'up' | 'down' | null}>({});
 
   const { move, write, on, gameData, gameStarted, connectToGame, cleanContext } = useGame();
   const { user, guestId, isAuthenticated } = useAuth();
@@ -60,11 +58,11 @@ const Game: React.FC = () => {
   
   const formattedTime = `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`;
 
-  const triggerAnimation = (type: 'valid' | 'invalid' | 'points', target: 'player' | 'opponent') => {
+  const triggerAnimation = (type: 'valid' | 'invalid' | 'points', playerId: string) => {
     setAnimation(prev => ({
       ...prev,
-      [target]: {
-        ...prev[target],
+      [playerId]: {
+        ...(prev[playerId] || { valid: false, invalid: false, points: false }),
         [type]: true
       }
     }));
@@ -72,8 +70,8 @@ const Game: React.FC = () => {
     setTimeout(() => {
       setAnimation(prev => ({
         ...prev,
-        [target]: {
-          ...prev[target],
+        [playerId]: {
+          ...(prev[playerId] || { valid: false, invalid: false, points: false }),
           [type]: false
         }
       }));
@@ -83,21 +81,21 @@ const Game: React.FC = () => {
   const handleMove = async (word: string) => {
     const res: MoveResponse = await move(word);
     if (res.success) {
-      triggerAnimation('points', 'player');
-      triggerAnimation('valid', 'player');
-      setPlayerError(null);
+      triggerAnimation('points', userId || '');
+      triggerAnimation('valid', userId || '');
+      setPlayerErrors(prev => ({ ...prev, [userId || '']: null }));
       return true;
     } else {
-      triggerAnimation('invalid', 'player');
-      setPlayerError(res.reason || 'Invalid move');
+      triggerAnimation('invalid', userId || '');
+      setPlayerErrors(prev => ({ ...prev, [userId || '']: res.reason || 'Invalid move' }));
       return false;
     }
   };
 
   const handleWrite = (word: string) => {
     write(word);
-    if (playerError) {
-      setPlayerError(null);
+    if (playerErrors[userId || '']) {
+      setPlayerErrors(prev => ({ ...prev, [userId || '']: null }));
     }
     console.log(word);
   }
@@ -105,35 +103,72 @@ const Game: React.FC = () => {
   const handleGameStateChange = (data: GameState) => {
     console.log('Game state changed');
     setTime(gameData?.elapsedTime || 0);
-    const newPlayers: PlayerData[] = [];
     
-    data.playerData.forEach((playerData, playerId) => {
-      newPlayers.push({
+    // Create new players array with ranks
+    const playerEntries = Array.from(data.playerData.entries());
+    const sortedPlayers: PlayerData[] = playerEntries
+      .map(([playerId, playerData]) => ({
         id: playerId,
-        username: 'Player ' + playerId.substring(0, 4),
+        username: playerData.username,
         points: playerData.points,
         letters: playerData.letters,
         written: playerData.written,
         words: playerData.words,
-      });
+      }))
+      .sort((a, b) => b.points - a.points);
+    
+    // Add rank information
+    sortedPlayers.forEach((player, index) => {
+      player.currentRank = index + 1;
     });
-    setPlayers(newPlayers);
+    
+    // Check for rank changes
+    const newRankChanges: {[playerId: string]: 'up' | 'down' | null} = {};
+    
+    players.forEach(oldPlayer => {
+      const newPlayer = sortedPlayers.find(p => p.id === oldPlayer.id);
+      if (newPlayer && oldPlayer.currentRank && newPlayer.currentRank) {
+        if (newPlayer.currentRank < oldPlayer.currentRank) {
+          newRankChanges[oldPlayer.id] = 'up';
+        } else if (newPlayer.currentRank > oldPlayer.currentRank) {
+          newRankChanges[oldPlayer.id] = 'down';
+        } else {
+          newRankChanges[oldPlayer.id] = null;
+        }
+      }
+    });
+    
+    setRankChanges(newRankChanges);
+    
+    // Clear rank change animations after a delay
+    setTimeout(() => {
+      setRankChanges({});
+    }, 2000);
+    
+    setPlayers(sortedPlayers);
   }
   
   const handleOpponentMoveInvalid = (data: InvalidMoveResponse) => {
-    triggerAnimation('invalid', 'opponent');
-    setOpponentError(data.reason || 'Opponent made an invalid move');
-    setTimeout(() => {
-      setOpponentError(null);
-    }, 3000);
+    const playerId = data.by;
+    if (playerId && playerId !== userId) {
+      triggerAnimation('invalid', playerId);
+      setPlayerErrors(prev => ({ ...prev, [playerId]: data.reason || 'Opponent made an invalid move' }));
+      
+      setTimeout(() => {
+        setPlayerErrors(prev => ({ ...prev, [playerId]: null }));
+      }, 3000);
+    }
     
     console.log('Opponent move is invalid');
   }
   
-  const handleOpponentMoveValid = () => {
-    triggerAnimation('points', 'opponent');
-    triggerAnimation('valid', 'opponent');
-    setOpponentError(null);
+  const handleOpponentMoveValid = (data: ValidMoveResponse) => {
+    const playerId = data.by;
+    if (playerId && playerId !== userId) {
+      triggerAnimation('points', playerId);
+      triggerAnimation('valid', playerId);
+      setPlayerErrors(prev => ({ ...prev, [playerId]: null }));
+    }
     console.log('Opponent move is valid');
   }
   
@@ -148,19 +183,19 @@ const Game: React.FC = () => {
   
   useEffect(() => {
     const unsubGameStateChange = on('gameStateChanged', (data: GameState) => {
-      console.log(`Game state changed: ${data}`);
+      console.log(`Game state changed: ${JSON.stringify(data)}`);
       handleGameStateChange(data);
     });
     const unsubOpponentMoveInvalid = on('opponentMoveInvalid', (data: InvalidMoveResponse) => {
       console.log(`Opponent move is invalid: ${data}`);
       handleOpponentMoveInvalid(data);
     });
-    const unsubOpponentMoveValid = on('opponentMoveValid', (data) => {
+    const unsubOpponentMoveValid = on('opponentMoveValid', (data: ValidMoveResponse) => {
       console.log(`Opponent move is valid: ${data}`);
-      handleOpponentMoveValid();
+      handleOpponentMoveValid(data);
     });
     const unsubGameStarted = on('gameStarted', (data) => {
-      console.log(`Game started: ${data}`);
+      console.log(`Game started: ${JSON.stringify(data)}`);
       handleGameStarted();
     });
     const unsubGameEnded = on('gameEnded', (results: GameResults) => {
@@ -193,22 +228,24 @@ const Game: React.FC = () => {
     connectToGame();
   }
 
-  const getOpponents = (results: GameResults) => {
-    return Object.entries(results.scores).filter(([key]) => key !== userId);
-  }
-  
-  const getOpponent = (results: GameResults) => {
-    return getOpponents(results)[0];
-  }
-  
-  const getPlayer = (results: GameResults) => {
-    return Object.entries(results.scores).find(([key]) => key === userId);
+  const getPlayersByRank = (results: GameResults) => {
+    return Object.entries(results.scores)
+      .map(([playerId, score]) => {
+        const player = players.find(p => p.id === playerId);
+        return {
+          id: playerId,
+          score,
+          isCurrentPlayer: playerId === userId,
+          username: player?.username || 'Player ' + playerId.substring(0, 4)
+        };
+      })
+      .sort((a, b) => b.score.points - a.score.points);
   }
 
   if (!gameStarted) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
-        <div className="text-2xl font-bold mb-4 text-indigo-600">Waiting for opponent</div>
+        <div className="text-2xl font-bold mb-4 text-indigo-600">Waiting for opponents</div>
         <div className="flex items-center justify-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600"></div>
         </div>
@@ -218,26 +255,39 @@ const Game: React.FC = () => {
   
   if (results && userId) {
     const isWinner = results.winner === userId;
-    const playerScore = getPlayer(results)?.[1];
-    const opponentData = getOpponent(results);
-    const opponentScore = opponentData?.[1];
+    const rankedPlayers = getPlayersByRank(results);
+    const playerRank = rankedPlayers.findIndex(p => p.id === userId) + 1;
     
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
           <h1 className={`text-5xl font-bold mb-6 text-center ${isWinner ? 'text-green-600' : 'text-red-600'}`}>
-            {isWinner ? '🏆 You Won! 🏆' : '😔 You Lost 😔'}
+            {isWinner ? '🏆 You Won! 🏆' : playerRank === 2 ? '🥈 So Close! 🥈' : '😔 You Placed #' + playerRank + ' 😔'}
           </h1>
           
-          <div className="flex justify-between mb-6">
-            <div className="text-center w-1/2 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-              <div className="text-xl font-semibold mb-2">You</div>
-              <div className="text-3xl font-bold text-blue-600">{playerScore}</div>
-            </div>
-            
-            <div className="text-center w-1/2 p-4 ml-4 bg-red-50 rounded-lg border-2 border-red-200">
-              <div className="text-xl font-semibold mb-2">Opponent</div>
-              <div className="text-3xl font-bold text-red-600">{opponentScore}</div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold mb-3 text-center">Final Scores</h2>
+            <div className="space-y-2">
+              {rankedPlayers.map((player, index) => (
+                <div 
+                  key={player.id} 
+                  className={`flex justify-between p-3 rounded-lg ${
+                    player.isCurrentPlayer 
+                      ? 'bg-blue-100 border-2 border-blue-300' 
+                      : 'bg-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-xl font-bold mr-2">#{index + 1}</span>
+                    <span className="font-medium">
+                      {player.isCurrentPlayer ? 'You' : player.username}
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold">
+                    {player.score.points}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           
@@ -260,104 +310,170 @@ const Game: React.FC = () => {
     );
   }
   
-  const playerData = players.find(player => player.id === userId);
-  const opponentData = players.find(player => player.id !== userId);
+  const currentPlayer = players.find(player => player.id === userId);
+  const opponents = players.filter(player => player.id !== userId);
+  const totalPlayers = players.length;
+  
+  // Determine layout based on number of players
+  const useSidebar = totalPlayers > 4;
+  
+  // Render player panel
+  const renderPlayerPanel = (player: PlayerData, isCurrentPlayer: boolean = false) => {
+    const bgColor = isCurrentPlayer ? 'bg-blue-50' : 'bg-red-50';
+    const borderColor = isCurrentPlayer ? 'border-blue-300' : 'border-red-300';
+    const textColor = isCurrentPlayer ? 'text-blue-600' : 'text-red-600';
+    const labelBgColor = isCurrentPlayer ? 'bg-blue-600' : 'bg-red-600';
+    
+    return (
+      <div className={`p-3 flex flex-col items-center ${bgColor} relative h-full`}>
+        <div className={`absolute top-1 ${isCurrentPlayer ? 'left-2' : 'right-2'} ${labelBgColor} text-white px-3 py-1 rounded-full text-xs font-semibold`}>
+          {isCurrentPlayer ? 'YOU' : player.username}
+        </div>
+        
+        <div className={`text-3xl font-bold mt-6 mb-2 transition-all duration-300 ${
+          animation[player.id]?.points ? 'scale-150 text-green-600' : textColor
+        }`}>
+          {player.points || 0}
+          {animation[player.id]?.points && <span className="animate-ping absolute text-green-500">+1</span>}
+        </div>
+        
+        {/* player error message */}
+        {playerErrors[player.id] && (
+          <div className="w-full mb-2 px-2 py-1 bg-red-100 border-l-4 border-red-500 text-red-700 text-sm">
+            {playerErrors[player.id]}
+          </div>
+        )}
+        
+        <div className={`w-full ${animation[player.id]?.invalid ? 'animate-shake' : ''}`}>
+          <DynamicTextarea
+            onChange={isCurrentPlayer ? handleWrite : () => {}}
+            onEnter={isCurrentPlayer ? handleMove : undefined}
+            placeholder={isCurrentPlayer ? "Type here..." : "Opponent's text"}
+            disabled={!isCurrentPlayer}
+            value={isCurrentPlayer ? undefined : player.written || ''}
+            className={`border-2 ${
+              animation[player.id]?.valid 
+                ? 'border-green-500' 
+                : animation[player.id]?.invalid 
+                  ? 'border-red-500' 
+                  : borderColor
+            }`}
+          />
+        </div>
+        
+        <div className={`text-2xl font-bold mt-2 mb-2 ${textColor}`}>
+          {player.letters || ''}
+        </div>
+        
+        <div className="w-full p-2 my-2 max-h-28 overflow-y-auto border-2 border-opacity-70 rounded-lg bg-white text-sm" style={{ borderColor: borderColor.replace('border-', '') }}>
+          <h3 className={`font-bold ${textColor} mb-1`}>{isCurrentPlayer ? 'Your' : 'Their'} Words:</h3>
+          <div className="grid grid-cols-2 gap-1">
+            {player.words.map((word, index) => (
+              <span key={index} className={`text-sm font-medium ${isCurrentPlayer ? 'bg-blue-100' : 'bg-red-100'} rounded px-1 py-0.5 truncate`}>
+                {word}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render leaderboard sidebar for 5+ players
+  const renderLeaderboard = () => {
+    return (
+      <div className="w-1/4 bg-gray-100 border-l border-gray-300 p-4 overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4 text-gray-800 text-center">Leaderboard</h2>
+        
+        <div className="space-y-2">
+          {players.map((player, index) => (
+            <div 
+              key={player.id}
+              className={`p-2 rounded-lg flex justify-between items-center transition-all duration-300 ${
+                player.id === userId 
+                  ? 'bg-blue-100 border border-blue-300' 
+                  : 'bg-white border border-gray-200'
+              } ${
+                rankChanges[player.id] === 'up' 
+                  ? 'transform -translate-y-2' 
+                  : rankChanges[player.id] === 'down' 
+                    ? 'transform translate-y-2' 
+                    : ''
+              }`}
+            >
+              <div className="flex items-center">
+                <span className="text-lg font-bold mr-2">#{index + 1}</span>
+                <span className="font-medium text-sm truncate max-w-28">
+                  {player.id === userId ? 'You' : player.username}
+                </span>
+              </div>
+              
+              <div className={`flex items-center ${
+                animation[player.id]?.points ? 'text-green-600' : ''
+              }`}>
+                {rankChanges[player.id] === 'up' && (
+                  <span className="text-green-500 mr-1">▲</span>
+                )}
+                {rankChanges[player.id] === 'down' && (
+                  <span className="text-red-500 mr-1">▼</span>
+                )}
+                <span className="font-bold">
+                  {player.points}
+                  {animation[player.id]?.points && (
+                    <span className="text-green-500 animate-ping absolute">+1</span>
+                  )}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="flex flex-col md:flex-row w-full h-screen bg-gray-50">
+    <div className="flex w-full h-screen bg-gray-50 relative">
       <div className="fixed top-0 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="text-6xl font-bold text-red-600 bg-white rounded-b-lg shadow-md px-6 py-2 border-b-2 border-l-2 border-r-2 border-gray-300">
+        <div className="text-4xl font-bold text-red-600 bg-white rounded-b-lg shadow-md px-6 py-2 border-b-2 border-l-2 border-r-2 border-gray-300">
           {formattedTime}
         </div>
       </div>
       
-      {/* user section */}
-      <div className="w-full md:w-1/2 border-b md:border-b-0 md:border-r border-gray-300 p-6 flex flex-col items-center bg-blue-50 relative pt-20">
-        <div className="absolute top-20 left-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-          YOU
-        </div>
-        
-        <div className={`text-5xl font-bold mt-8 mb-4 transition-all duration-300 ${animation.player.points ? 'scale-150 text-green-600' : 'text-blue-600'}`}>
-          {playerData?.points || 0}
-          {animation.player.points && <span className="animate-ping absolute text-green-500">+1</span>}
-        </div>
-        
-        {/* player error message */}
-        {playerError && (
-          <div className="w-full mb-2 px-3 py-2 bg-red-100 border-l-4 border-red-500 text-red-700">
-            {playerError}
+      <div className={`flex flex-wrap pt-16 ${useSidebar ? 'w-3/4' : 'w-full'}`}>
+        {/* Current player always shown */}
+        {currentPlayer && (
+          <div className={`${
+            totalPlayers <= 2
+              ? 'w-1/2'
+              : totalPlayers <= 4
+                ? 'w-1/2'
+                : 'w-full'
+          } border-b border-r border-gray-300`}>
+            {renderPlayerPanel(currentPlayer, true)}
           </div>
         )}
         
-        <div className={`w-full ${animation.player.invalid ? 'animate-shake' : ''}`}>
-          <DynamicTextarea
-            onChange={handleWrite}
-            onEnter={handleMove}
-            placeholder="Type here..."
-            disabled={false}
-            className={`border-2 ${animation.player.valid ? 'border-green-500' : animation.player.invalid ? 'border-red-500' : 'border-blue-300'}`}
-          />
-        </div>
-        
-        <div className="text-4xl font-bold mt-4 mb-2 text-blue-600">
-          {playerData?.letters || ''}
-        </div>
-        
-        <div className="w-full p-4 my-4 max-h-40 overflow-y-auto border-2 border-blue-300 rounded-lg bg-white">
-          <h3 className="font-bold text-blue-600 mb-2">Your Words:</h3>
-          <div className="grid grid-cols-3 gap-2">
-            {playerData?.words.map((word, index) => (
-              <span key={index} className="text-lg font-medium bg-blue-100 rounded px-2 py-1">
-                {word}
-              </span>
-            ))}
-          </div>
-        </div>
+        {/* Opponents - show all for 2-4 players, or just top 1-3 for 5+ */}
+        {opponents
+          .slice(0, useSidebar ? 3 : opponents.length)
+          .map((opponent, index) => (
+            <div 
+              key={opponent.id} 
+              className={`${
+                totalPlayers <= 2
+                  ? 'w-1/2'
+                  : totalPlayers <= 4
+                    ? 'w-1/2'
+                    : 'w-full'
+              } border-b ${index < opponents.length - 1 ? 'border-r' : ''} border-gray-300`}
+            >
+              {renderPlayerPanel(opponent)}
+            </div>
+          ))}
       </div>
-
-      {/* opponent section */}
-      <div className="w-full md:w-1/2 p-6 flex flex-col items-center bg-red-50 relative pt-20">
-        <div className="absolute top-20 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-          OPPONENT
-        </div>
-        
-        <div className={`text-5xl font-bold mt-8 mb-4 transition-all duration-300 ${animation.opponent.points ? 'scale-150 text-green-600' : 'text-red-600'}`}>
-          {opponentData?.points || 0}
-          {animation.opponent.points && <span className="animate-ping absolute text-green-500">+1</span>}
-        </div>
-        
-        {/* opponent error message */}
-        {opponentError && (
-          <div className="w-full mb-2 px-3 py-2 bg-red-100 border-l-4 border-red-500 text-red-700">
-            {opponentError}
-          </div>
-        )}
-        
-        <div className={`w-full ${animation.opponent.invalid ? 'animate-shake' : ''}`}>
-          <DynamicTextarea
-            onChange={(val) => console.log('Right:', val)}
-            placeholder="Opponent's text"
-            disabled={true}
-            value={opponentData?.written || ''}
-            className={`border-2 ${animation.opponent.valid ? 'border-green-500' : animation.opponent.invalid ? 'border-red-500' : 'border-red-300'}`}
-          />
-        </div>
-        
-        <div className="text-4xl font-bold mt-4 mb-2 text-red-600">
-          {opponentData?.letters || ''}
-        </div>
-        
-        <div className="w-full p-4 my-4 max-h-40 overflow-y-auto border-2 border-red-300 rounded-lg bg-white">
-          <h3 className="font-bold text-red-600 mb-2">Opponent's Words:</h3>
-          <div className="grid grid-cols-3 gap-2">
-            {opponentData?.words.map((word, index) => (
-              <span key={index} className="text-lg font-medium bg-red-100 rounded px-2 py-1">
-                {word}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
+      
+      {/* Sidebar for 5+ players */}
+      {useSidebar && renderLeaderboard()}
       
       <style>{`
         @keyframes shake {

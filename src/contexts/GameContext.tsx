@@ -247,12 +247,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log(`gameData (client side data): ${JSON.stringify(gameData)}`);
             gameState.playerData.forEach((playerData, playerId) => {
                 const opponent = gameData.opponents.find(opponent => opponent.userId === playerId);
-
                 if(!opponent) throw new Error(`could not find opponent with id ${playerId} in updateGameData`);
                 opponent.points = playerData.points;
                 opponent.letters = playerData.letters;
                 opponent.written = playerData.written;
                 opponent.words = playerData.words;
+                opponent.username = playerData.username;
             })
         }
     }
