@@ -17,11 +17,10 @@ interface LobbyProps {
   onReady: () => void;
   onUnready: () => void;
   onStart: () => void;
+  onLeave: () => void;
 }
 
-const Lobby: React.FC<LobbyProps> = ({ lobby, userId, onReady, onUnready, onStart }) => {
-    const { user } = useAuth();
-
+const Lobby: React.FC<LobbyProps> = ({ lobby, userId, onReady, onUnready, onStart, onLeave }) => {
     console.log(`lobby initialized with: ${JSON.stringify(lobby)}`);
     return (
         <div className="flex flex-col items-center justify-center p-4 bg-gray-100 min-h-screen">
@@ -65,6 +64,12 @@ const Lobby: React.FC<LobbyProps> = ({ lobby, userId, onReady, onUnready, onStar
                 Start
               </button>
             )}
+          </div>
+          <div className="mt-12">
+            <button
+                onClick={onLeave}
+                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-md shadow-md transition-colors"
+            > Leave Lobby </button>
           </div>
         </div>
       );

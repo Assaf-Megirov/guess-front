@@ -76,11 +76,9 @@ const Index: React.FC<IndexProps> = () => {
         if(storedGameCode && storedUsername){
             setGameCode(storedGameCode);
             setUsername(storedUsername);
-            // Wait for socket to be ready before joining
             if(socketRef.current) {
                 joinGame(storedGameCode, storedUsername);
             } else {
-                // If socket isn't ready yet, wait for it
                 const checkSocket = setInterval(() => {
                     if(socketRef.current) {
                         joinGame(storedGameCode, storedUsername);
@@ -88,6 +86,9 @@ const Index: React.FC<IndexProps> = () => {
                     }
                 }, 100);
             }
+        }
+        if(storedUsername){ //remember the username regardless of whether we joined a lobby or not
+            setUsername(storedUsername);
         }
     }, []);
 
@@ -167,10 +168,23 @@ const Index: React.FC<IndexProps> = () => {
         const playerId = isGuest ? guestId : user?.id;
         socket.emit('start_game', {code: lobby?.code, playerId: playerId});
     }
+    const onLeave = () => {
+        console.log('leave');
+        const socket = socketRef.current;
+        if(!socket){
+            console.error('Socket not initialized');
+            return;
+        }
+        const playerId = isGuest ? guestId : user?.id;
+        socket.emit('leave_lobby', {code: lobby?.code, playerId: playerId});
+        setLobby(null);
+        localStorage.removeItem('lobbyCode');
+    }
+    
     if(lobby){
         const userId = isGuest ? guestId : user?.id;
         if (!userId) return null;
-        return <Lobby lobby={lobby} userId={userId} onReady={onReady} onUnready={onUnready} onStart={onStart} />
+        return <Lobby lobby={lobby} userId={userId} onReady={onReady} onUnready={onUnready} onStart={onStart} onLeave={onLeave} />
     }
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
