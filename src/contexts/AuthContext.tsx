@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { LoginData } from '../components/auth/Login';
 import { RegisterData } from '../components/auth/Register';
-import { login, register, logout } from '../api/auth';
+import { login, register, logout, getGuestId } from '../api/auth';
 import { User } from '../types/User';
 
 interface FieldErrors {
@@ -16,6 +16,7 @@ interface AuthContextType {
   error: string | null;
   isAuthenticated: boolean;
   isInitialized: boolean;
+  guestId: string | null;
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,6 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [guestId, setGuestId] = useState<string | null>(null);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
@@ -44,6 +46,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setIsInitialized(true); // Mark initialization as complete
   }, []);
+
+  useEffect(() => {
+    if(isAuthenticated){
+      console.log('AuthContext: User authenticated skipping guestId fetch');
+      setGuestId(null);
+      localStorage.removeItem('guestId');
+      return;
+    }
+    const storedGuestId = localStorage.getItem('guestId');
+    if(storedGuestId){
+      setGuestId(storedGuestId);
+      console.log('AuthContext: Guest ID fetched from localStorage', storedGuestId);
+      return;
+    }
+    getGuestId().then((id: string) => {
+      setGuestId(id);
+      console.log('AuthContext: Guest ID fetched', id);
+      localStorage.setItem('guestId', id);
+    });
+  }, [isAuthenticated]);
 
   const handleAuthResponse = (response: { token: string; user: User }) => {
     setToken(response.token);
@@ -124,6 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         errors,
         error,
         isAuthenticated,
+        guestId,
         login: handleLogin,
         register: handleRegister,
         logout: handleLogout,

@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { GameProvider, useGame } from './contexts/GameContext';
 import Game from './components/game/Game';
 import GameInvites from './components/game/GameInvites';
+import Index from './components/Index';
 
 function App() {
   return (
@@ -44,14 +45,15 @@ function App() {
                     </PrivateRoute>
                   }/>
                   <Route path='/game' element={
-                    <PrivateRoute>
                       <Game />
-                    </PrivateRoute>
                   }/>
                   <Route path='/gameInvites' element={
                     <PrivateRoute>
                       <GameInvites />
                     </PrivateRoute>
+                  }/>
+                  <Route path='/index' element={
+                      <Index />
                   }/>
                 </Routes>
               </div>

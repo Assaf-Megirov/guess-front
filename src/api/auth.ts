@@ -76,3 +76,15 @@ export const logout = async (token: string): Promise<void> => {
     throw new Error('Logout failed');
   }
 }; 
+
+export const getGuestId = async (): Promise<string> => {
+  const response = await fetch(`${API_BASE_URL}/guestId`);
+  if (!response.ok) {
+    throw new Error('Failed to get guest ID');
+  }
+  try {
+    return (await response.json()).guestId;
+  } catch (error) {
+    throw new Error('Invalid guest ID response format');
+  }
+};

@@ -60,10 +60,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [allowConnectToGame, setAllowConnectToGame] = useState<boolean>(false);
 
     const { registerGameInvite, unregisterGameInvite } = useSocial();
-    const { token, user } = useAuth();
+    const { token, user, guestId, isAuthenticated } = useAuth();
     console.log(`GameProvider initialized, user is ${JSON.stringify(user)}, userId is ${user?.id}`);
     const socketRef = React.useRef<Socket | null>(null);
-
+    const userId = isAuthenticated ? user?.id : guestId;
     // Add effect to track user changes
     useEffect(() => {
         console.log('User state changed in GameProvider:', JSON.stringify(user));
@@ -99,20 +99,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [registerGameInvite])
 
     useEffect(() => {
-        if (!token || !gameData) {
-            console.log('Token or gameData is not available yet. Waiting...');
+        if ((!token && !guestId) || !gameData) {
+            console.log(`Token or gameData is not available yet. Waiting... token: ${token}, guestId: ${guestId}, gameData: ${gameData}`);
             return;
         }
         if(!allowConnectToGame){
             console.log('Not allowed to connect to game yet. Waiting for connectToGame to be called...');
             return;
         }
-        console.log(`Attempting to connect to socket at: ${SOCKET_URL}, with token: ${token}, gameId: ${gameData?.gameId}`);
+        const auth = isAuthenticated ? {token: token, gameId: gameData?.gameId} : {guestId: guestId, gameId: gameData?.gameId};
+        console.log(`Attempting to connect to socket at: ${SOCKET_URL}, with auth: ${JSON.stringify(auth)}`);
         const socket = io(SOCKET_URL, {
-            auth: {
-                token: token,
-                gameId: gameData?.gameId,
-            },
+            auth: auth,
         });
         socketRef.current = socket;
         socket.on('game_started', (data: any) => {
@@ -123,7 +121,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 gameData.status = GameStatus.InProgress;
                 setGameStarted(true);
                 emit('gameStarted', data);
-                removeGameInvite(gameData.opponents.find(opponent => opponent.userId !== user?.id)?.userId);
+                removeGameInvite(gameData.opponents.find(opponent => opponent.userId !== userId)?.userId);
             }
         });
         
@@ -141,13 +139,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         socket.on('invalid', (data: InvalidMoveResponse) => {
             //here we only have to handle the opponents moves as we handle the users own moves after making a move ourselves
-            if(data.by === user?.id) return; //this was our move and it was handled (we assume)
+            if(data.by === userId) return; //this was our move and it was handled (we assume)
             console.log('Opponent made invalid move with reason: ', data.reason);
             emit('opponentMoveInvalid', data); //data: InvalidMoveResponse
         });
 
         socket.on('valid', (data: ValidMoveResponse) => {
-            if(data.by === user?.id) return; //this was our move and it was handled (we assume)
+            if(data.by === userId) return; //this was our move and it was handled (we assume)
             console.log('Opponent made valid move');
             emit('opponentMoveValid', data); //data: ValidMoveResponse
         });
@@ -162,9 +160,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => {
             socket.disconnect();
         };
-    }, [token, gameData, user, allowConnectToGame]);
+    }, [token, gameData, user, guestId, isAuthenticated, allowConnectToGame]);
 
-    const gameInitToGameData = (gameInitData: GameInit): GameData => {
+    const gameInitToGameData = (gameInitData: GameInit): GameData => { //TODO: currently not modifying to use guestId as this function is not used in the lobby
         console.log('gameInitToGameData called with user:', JSON.stringify(user));
         if(!user) {
             console.error('Cannot create game data: User is not logged in');
@@ -214,13 +212,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return;
             }
             const handleValid = (data: ValidMoveResponse) => {
-                if (data.by === user?.id) {
+                if (data.by === userId) {
                     cleanup();
                     resolve({success: true});
                 }
             };
             const handleInvalid = (data: InvalidMoveResponse) => {
-                if (data.by === user?.id) {
+                if (data.by === userId) {
                     cleanup();
                     resolve({success: false, reason: data.reason});
                 }
@@ -246,7 +244,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         gameData.status = gameState.state;
         gameData.elapsedTime = gameState.elapsedTime;
         if(gameState.state === GameStatus.InProgress){
-            console.log(`Player data: ${JSON.stringify(gameState.playerData)} ||| of type: ${typeof gameState.playerData}`);
+            console.log(`gameData (client side data): ${JSON.stringify(gameData)}`);
             gameState.playerData.forEach((playerData, playerId) => {
                 const opponent = gameData.opponents.find(opponent => opponent.userId === playerId);
 

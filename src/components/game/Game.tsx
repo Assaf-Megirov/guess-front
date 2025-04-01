@@ -41,7 +41,8 @@ const Game: React.FC = () => {
   });
 
   const { move, write, on, gameData, gameStarted, connectToGame, cleanContext } = useGame();
-  const { user } = useAuth();
+  const { user, guestId, isAuthenticated } = useAuth();
+  const userId = isAuthenticated ? user?.id : guestId;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -177,7 +178,11 @@ const Game: React.FC = () => {
   }, [on]);
 
   const handleHome = () => {
-    navigate('/');
+    if(isAuthenticated){
+      navigate('/');
+    } else {
+      navigate('/index');
+    }
     cleanContext();
   }
 
@@ -189,7 +194,7 @@ const Game: React.FC = () => {
   }
 
   const getOpponents = (results: GameResults) => {
-    return Object.entries(results.scores).filter(([key]) => key !== user?.id);
+    return Object.entries(results.scores).filter(([key]) => key !== userId);
   }
   
   const getOpponent = (results: GameResults) => {
@@ -197,7 +202,7 @@ const Game: React.FC = () => {
   }
   
   const getPlayer = (results: GameResults) => {
-    return Object.entries(results.scores).find(([key]) => key === user?.id);
+    return Object.entries(results.scores).find(([key]) => key === userId);
   }
 
   if (!gameStarted) {
@@ -211,8 +216,8 @@ const Game: React.FC = () => {
     );
   }
   
-  if (results && user) {
-    const isWinner = results.winner === user.id;
+  if (results && userId) {
+    const isWinner = results.winner === userId;
     const playerScore = getPlayer(results)?.[1];
     const opponentData = getOpponent(results);
     const opponentScore = opponentData?.[1];
@@ -255,8 +260,8 @@ const Game: React.FC = () => {
     );
   }
   
-  const playerData = players.find(player => player.id === user?.id);
-  const opponentData = players.find(player => player.id !== user?.id);
+  const playerData = players.find(player => player.id === userId);
+  const opponentData = players.find(player => player.id !== userId);
 
   return (
     <div className="flex flex-col md:flex-row w-full h-screen bg-gray-50">
