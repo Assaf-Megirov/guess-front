@@ -11,6 +11,17 @@ interface DynamicTextareaProps {
     minFontSize?: number;
 }
 
+/**
+ * 
+ * @param disabled - disables the textarea
+ * @param value - overrides the value (when this prop changes the new value overrides the internal value)
+ * @param onChange - called when the internal value changes
+ * @param onEnter - called when the enter key is pressed
+ * @param placeholder - placeholder text
+ * @param className - className for the textarea
+ * @param initialFontSize - initial font size
+ * @param minFontSize - minimum font size
+ */
 const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onChange, onEnter,placeholder, className, initialFontSize, minFontSize }) => {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [internalValue, setinternalValue] = useState('');

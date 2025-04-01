@@ -37,6 +37,16 @@ const Sidebar: React.FC = () => {
                 Incoming game invites
               </Link>
             </li>
+            <li>
+              <Link to="/singleGame" className="block px-4 py-2 rounded hover:bg-gray-700">
+                Single Game
+              </Link>
+            </li>
+            <li>
+              <Link to="/index" className="block px-4 py-2 rounded hover:bg-gray-700">
+                Index
+              </Link>
+            </li>
           </ul>
         </nav>
         <div className="p-4 border-t border-gray-700">

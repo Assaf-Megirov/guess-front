@@ -13,7 +13,7 @@ import { GameProvider, useGame } from './contexts/GameContext';
 import Game from './components/game/Game';
 import GameInvites from './components/game/GameInvites';
 import Index from './components/Index';
-
+import SingleGame from './components/game/SingleGame';
 function App() {
   return (
     <AuthProvider>
@@ -54,6 +54,9 @@ function App() {
                   }/>
                   <Route path='/index' element={
                       <Index />
+                  }/>
+                  <Route path='/singleGame' element={
+                      <SingleGame />
                   }/>
                 </Routes>
               </div>
