@@ -5,6 +5,7 @@ import Lobby from './game/Lobby';
 import { useGame } from '../contexts/GameContext';
 import { GameStatus } from '@/types/GameStatus';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
 const LOBBY_NAMESPACE = import.meta.env.VITE_API_LOBBY_NAMESPACE;
 const SOCKET_URL = `${BASE_SOCKET_URL}/${LOBBY_NAMESPACE}`;
@@ -25,10 +26,13 @@ interface IndexProps {
 
 const Index: React.FC<IndexProps> = () => {
     const socketRef = React.useRef<Socket | null>(null);
+    const [socketConnected, setSocketConnected] = useState<boolean>(false);
     const [lobby, setLobby] = useState<Lobby | null>(null);
     const lobbyRef = React.useRef<Lobby | null>(null);
     const [gameCode, setGameCode] = useState<string>('');
     const [username, setUsername] = useState<string>('');
+    const [lobbyError, setLobbyError] = useState<string | null>(null);
+    const [usernameError, setUsernameError] = useState<string | null>(null);
     const { guestId, isAuthenticated, user } = useAuth();
     const { setGameData, connectToGame } = useGame();
     const navigate = useNavigate();
@@ -48,6 +52,10 @@ const Index: React.FC<IndexProps> = () => {
             },
         });
         socketRef.current = socket;
+        socket.on('connect', () => {
+            console.log('socket connected');
+            setSocketConnected(true);
+        });
         socket.on('lobby_state', (lobby: {code: string, players: {playerId: string, username: string, ready: boolean}[], admin: {playerId: string, username: string}}) => {
             console.log(`lobby state: ${JSON.stringify(lobby)}`);
             const newLobby = {code: lobby.code, players: lobby.players.map(player => ({id: player.playerId, username: player.username, ready: player.ready})), admin: {id: lobby.admin.playerId, username: lobby.admin.username}};
@@ -64,6 +72,10 @@ const Index: React.FC<IndexProps> = () => {
             console.log(`Game started: ${JSON.stringify(data, null, 2)}`);
             navigate('/game');
         });
+        socket.on('disconnect', () => {
+            console.log('socket disconnected');
+            setSocketConnected(false);
+        });
 
         return () => {
             socket.disconnect();
@@ -76,21 +88,19 @@ const Index: React.FC<IndexProps> = () => {
         if(storedGameCode && storedUsername){
             setGameCode(storedGameCode);
             setUsername(storedUsername);
-            if(socketRef.current) {
-                joinGame(storedGameCode, storedUsername);
-            } else {
-                const checkSocket = setInterval(() => {
-                    if(socketRef.current) {
-                        joinGame(storedGameCode, storedUsername);
-                        clearInterval(checkSocket);
-                    }
-                }, 100);
-            }
+            const checkSocketConnection = setInterval(() => {
+                if(socketRef.current && socketConnected) {
+                    console.log('Socket is connected, attempting to rejoin game');
+                    joinGame(storedGameCode, storedUsername);
+                    clearInterval(checkSocketConnection);
+                }
+            }, 250);
+            return () => clearInterval(checkSocketConnection);
         }
-        if(storedUsername){ //remember the username regardless of whether we joined a lobby or not
+        if(storedUsername){
             setUsername(storedUsername);
         }
-    }, []);
+    }, [socketConnected]);
 
     const createGame = () => {
         console.log('create game called');
@@ -99,6 +109,15 @@ const Index: React.FC<IndexProps> = () => {
             console.error('Socket not initialized');
             return;
         }
+        if(!socket.connected){
+            toast.error('We had trouble connecting to the server, please try again later');
+            return;
+        }
+        if(!username){
+            setUsernameError('Please enter a username');
+            return;
+        }
+        setUsernameError(null);
         socket.on('lobby_created', ({code}: {code: string}) => {
             setGameCode(code);
             joinGame(code);
@@ -112,20 +131,52 @@ const Index: React.FC<IndexProps> = () => {
             console.error('Socket not initialized');
             return;
         }
+        if(!socket.connected){
+            //try to reconnect
+            console.log('socket not connected, attempting to reconnect');
+            socket.connect();
+            const onConnect = () => {
+                socket.off('connect', onConnect);
+                const codeToUse = codeOverride || gameCode;
+                const usernameToUse = usernameOverride || (isGuest ? username : user?.username);
+                console.log(`Socket connected, joining lobby with code: ${codeToUse} and username: ${usernameToUse}`);
+                socket.emit('join_lobby', {
+                    code: codeToUse,
+                    username: usernameToUse,
+                });
+            }
+            socket.on('connect', onConnect);
+            if(!socket.connected){
+                toast.error('We had trouble connecting to the server, please try again later');
+                return;
+            }
+            setTimeout(() => {
+                if(!socket.connected) {
+                    socket.off('connect', onConnect);
+                    toast.error('We had trouble connecting to the server, please try again later');
+                }
+            }, 3000);
+        }
+        if(!username){
+            setUsernameError('Please enter a username');
+            return;
+        }
+        setUsernameError(null);
         socket.on('joined_lobby', ({code, players, admin}: {code: string, players: {playerId: string, username: string, ready: boolean}[], admin: {id: string, username: string}}) => {
             setLobby({code, players: players.map(player => ({id: player.playerId, username: player.username, ready: player.ready})), admin});
             localStorage.setItem('lobbyCode', code);
             localStorage.setItem('username', username);
+            setLobbyError(null);
         });
         socket.on('invalid_lobby_code', ({code}: {code: string}) => {
             console.error(`Invalid lobby code: ${code}`);
             setLobby(null);
-            //TODO: show error message to the user
+            setLobbyError(`lobby code is invalid, codes can only be letters and numbers and only 4 characters long`);
         });
         socket.on('lobby_not_found', ({code}: {code: string}) => {
             console.error(`Lobby not found: ${code}`);
             setLobby(null);
-            //TODO: show error message to the user
+            setLobbyError(`lobby not found, please check the code and try again`);
         });
         
         const codeToUse = codeOverride || gameCode;
@@ -189,10 +240,22 @@ const Index: React.FC<IndexProps> = () => {
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
         <h1 className="text-4xl font-bold mb-8">Index</h1>
+        {usernameError && (
+          <div className="w-64 mb-1">
+            <div className="flex items-start gap-1">
+              <span className="text-[8px] mt-1 flex-shrink-0">•</span>
+              <span className="text-red-500 text-xs flex-1 break-words whitespace-normal">
+                {usernameError}
+              </span>
+            </div>
+          </div>
+        )}
         <input
                 type="text"
                 placeholder="Enter username"
-                className="w-64 px-4 py-2 mb-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-64 px-4 py-2 mb-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  usernameError ? 'border-red-500' : 'border-gray-300'
+                }`}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
             />
@@ -202,10 +265,22 @@ const Index: React.FC<IndexProps> = () => {
             className="w-48 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow-md transition-colors"
             > Create Game </button>
             <div className="flex flex-col items-center">
+            {lobbyError && (
+              <div className="w-64 mb-1">
+                <div className="flex items-start gap-1">
+                  <span className="text-[8px] mt-1 flex-shrink-0">•</span>
+                  <span className="text-red-500 text-xs flex-1 break-words whitespace-normal">
+                    {lobbyError}
+                  </span>
+                </div>
+              </div>
+            )}
             <input
                 type="text"
                 placeholder="Enter Game Code"
-                className="w-64 px-4 py-2 mb-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-64 px-4 py-2 mb-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  lobbyError ? 'border-red-500' : 'border-gray-300'
+                }`}
                 value={gameCode}
                 onChange={(e) => setGameCode(e.target.value)}
             />

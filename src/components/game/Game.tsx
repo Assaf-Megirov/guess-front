@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import DynamicTextarea from './DynamicTextArea';
 import { InvalidMoveResponse, MoveResponse, useGame, ValidMoveResponse } from '@/contexts/GameContext';
+import { GameStatus } from '@/types/GameStatus';
 import { GameState } from '@/types/GameState';
 import { useAuth } from '@/contexts/AuthContext';
 import { GameResults } from '@/types/GameResults';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface PlayerData {
   id: string;
@@ -38,7 +40,7 @@ const Game: React.FC = () => {
   const [animation, setAnimation] = useState<AnimationState>({});
   const [rankChanges, setRankChanges] = useState<{[playerId: string]: 'up' | 'down' | null}>({});
 
-  const { move, write, on, gameData, gameStarted, connectToGame, cleanContext } = useGame();
+  const { move, write, on, gameData, gameStarted, gamePaused, connectToGame, cleanContext, setGameData } = useGame();
   const { user, guestId, isAuthenticated } = useAuth();
   const userId = isAuthenticated ? user?.id : guestId;
   const navigate = useNavigate();
@@ -104,7 +106,6 @@ const Game: React.FC = () => {
     console.log('Game state changed');
     setTime(gameData?.elapsedTime || 0);
     
-    // Create new players array with ranks
     const playerEntries = Array.from(data.playerData.entries());
     const sortedPlayers: PlayerData[] = playerEntries
       .map(([playerId, playerData]) => ({
@@ -117,12 +118,10 @@ const Game: React.FC = () => {
       }))
       .sort((a, b) => b.points - a.points);
     
-    // Add rank information
     sortedPlayers.forEach((player, index) => {
       player.currentRank = index + 1;
     });
     
-    // Check for rank changes
     const newRankChanges: {[playerId: string]: 'up' | 'down' | null} = {};
     
     players.forEach(oldPlayer => {
@@ -137,10 +136,7 @@ const Game: React.FC = () => {
         }
       }
     });
-    
     setRankChanges(newRankChanges);
-    
-    // Clear rank change animations after a delay
     setTimeout(() => {
       setRankChanges({});
     }, 2000);
@@ -180,6 +176,12 @@ const Game: React.FC = () => {
   const handleGameEnded = (results: GameResults) => {
     setResults(results);
   }
+
+  const handlePlayerRemoved = (data: {playerId: string, username: string, reason: string}) => {
+    console.log(`${data.username} removed from game: ${data.reason}`);
+    //show toast to the user
+    toast.error(`${data.username} removed from game: ${data.reason}`);
+  }
   
   useEffect(() => {
     const unsubGameStateChange = on('gameStateChanged', (data: GameState) => {
@@ -202,6 +204,11 @@ const Game: React.FC = () => {
       console.log(`Game ended: ${results}`);
       handleGameEnded(results);
     });
+    const unsubPlayerRemoved = on('playerRemoved', (data: {playerId: string, username: string, reason: string}) => {
+      console.log(`${data.username} removed from game: ${data.reason}`);
+      handlePlayerRemoved(data);
+    });
+
 
     return () => {
       unsubGameStateChange();
@@ -209,6 +216,7 @@ const Game: React.FC = () => {
       unsubOpponentMoveValid();
       unsubGameStarted();
       unsubGameEnded();
+      unsubPlayerRemoved();
     } 
   }, [on]);
 
@@ -222,9 +230,18 @@ const Game: React.FC = () => {
   }
 
   const handlePlayAgain = () => {
+    const gameIdTemp = gameData?.gameId;
+    cleanContext();
     setResults(null);
     setPlayers([]);
     setTime(0);
+    if(gameIdTemp){
+      setGameData({gameId: gameIdTemp, opponents: [], status: GameStatus.NotStarted, elapsedTime: 0});
+    }else{
+      console.error('No gameId found');
+      toast.error('We had trouble restarting the game');
+      navigate('/');
+    }
     connectToGame();
   }
 
@@ -295,8 +312,9 @@ const Game: React.FC = () => {
             <button 
               className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200"
               onClick={handlePlayAgain}
+              disabled={true}
             >
-              Play Again
+              Play Again (Coming Soon)
             </button>
             <button 
               className="w-1/2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200"
@@ -313,11 +331,8 @@ const Game: React.FC = () => {
   const currentPlayer = players.find(player => player.id === userId);
   const opponents = players.filter(player => player.id !== userId);
   const totalPlayers = players.length;
-  
-  // Determine layout based on number of players
   const useSidebar = totalPlayers > 4;
   
-  // Render player panel
   const renderPlayerPanel = (player: PlayerData, isCurrentPlayer: boolean = false) => {
     const bgColor = isCurrentPlayer ? 'bg-blue-50' : 'bg-red-50';
     const borderColor = isCurrentPlayer ? 'border-blue-300' : 'border-red-300';
@@ -379,13 +394,12 @@ const Game: React.FC = () => {
     );
   };
   
-  // Render leaderboard sidebar for 5+ players
   const renderLeaderboard = () => {
     return (
-      <div className="w-1/4 bg-gray-100 border-l border-gray-300 p-4 overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4 text-gray-800 text-center">Leaderboard</h2>
+      <div className="w-1/4 bg-gray-100 border-l border-gray-300 p-4 overflow-y-auto md:w-1/4 sm:w-1/3 max-sm:w-2/5 max-sm:p-2">
+        <h2 className="text-xl font-bold mb-4 text-gray-800 text-center max-sm:text-lg max-sm:mb-2">Leaderboard</h2>
         
-        <div className="space-y-2">
+        <div className="space-y-2 max-sm:space-y-1">
           {players.map((player, index) => (
             <div 
               key={player.id}
@@ -399,16 +413,16 @@ const Game: React.FC = () => {
                   : rankChanges[player.id] === 'down' 
                     ? 'transform translate-y-2' 
                     : ''
-              }`}
+              } max-sm:p-1`}
             >
-              <div className="flex items-center">
-                <span className="text-lg font-bold mr-2">#{index + 1}</span>
-                <span className="font-medium text-sm truncate max-w-28">
+              <div className="flex items-center w-3/4 max-sm:w-4/5">
+                <span className="text-lg font-bold mr-2 max-sm:text-sm max-sm:mr-1 min-w-5">#{index + 1}</span>
+                <span className="font-medium text-sm truncate max-sm:text-xs">
                   {player.id === userId ? 'You' : player.username}
                 </span>
               </div>
               
-              <div className={`flex items-center ${
+              <div className={`flex items-center justify-end w-1/4 max-sm:w-1/5 ${
                 animation[player.id]?.points ? 'text-green-600' : ''
               }`}>
                 {rankChanges[player.id] === 'up' && (
@@ -417,7 +431,7 @@ const Game: React.FC = () => {
                 {rankChanges[player.id] === 'down' && (
                   <span className="text-red-500 mr-1">▼</span>
                 )}
-                <span className="font-bold">
+                <span className="font-bold max-sm:text-sm text-right">
                   {player.points}
                   {animation[player.id]?.points && (
                     <span className="text-green-500 animate-ping absolute">+1</span>
@@ -431,6 +445,69 @@ const Game: React.FC = () => {
     );
   };
 
+  if (gamePaused) {
+    return (
+      <div className="relative w-full h-screen">
+        {/* Blurred game UI in background */}
+        <div className="absolute inset-0 filter blur-sm opacity-50">
+          {/* Copy of your existing game UI code here */}
+          <div className="flex w-full h-screen bg-gray-50 relative">
+            <div className="fixed top-0 left-1/2 transform -translate-x-1/2 z-10">
+              <div className="text-4xl font-bold text-red-600 bg-white rounded-b-lg shadow-md px-6 py-2 border-b-2 border-l-2 border-r-2 border-gray-300">
+                {formattedTime}
+              </div>
+            </div>
+            
+            <div className={`flex flex-wrap pt-16 ${useSidebar ? 'w-3/4' : 'w-full'}`}>
+              {currentPlayer && (
+                <div className={`${
+                  totalPlayers <= 2
+                    ? 'w-1/2'
+                    : totalPlayers <= 4
+                      ? 'w-1/2'
+                      : 'w-full'
+                } border-b border-r border-gray-300`}>
+                  {renderPlayerPanel(currentPlayer, true)}
+                </div>
+              )}
+              
+              {opponents
+                .slice(0, useSidebar ? 3 : opponents.length)
+                .map((opponent, index) => (
+                  <div 
+                    key={opponent.id} 
+                    className={`${
+                      totalPlayers <= 2
+                        ? 'w-1/2'
+                        : totalPlayers <= 4
+                          ? 'w-1/2'
+                          : 'w-full'
+                    } border-b ${index < opponents.length - 1 ? 'border-r' : ''} border-gray-300`}
+                  >
+                    {renderPlayerPanel(opponent)}
+                  </div>
+                ))}
+            </div>
+            
+            {useSidebar && renderLeaderboard()}
+          </div>
+        </div>
+        
+        {/* Overlay with loading animation */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-40 z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600 mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Game Paused</h2>
+            <p className="text-gray-600 mb-4">Waiting for player to reconnect...</p>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-4">
+              <div className="bg-indigo-600 h-2.5 rounded-full animate-pulse" style={{width: '100%'}}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full h-screen bg-gray-50 relative">
       <div className="fixed top-0 left-1/2 transform -translate-x-1/2 z-10">
@@ -439,7 +516,7 @@ const Game: React.FC = () => {
         </div>
       </div>
       
-      <div className={`flex flex-wrap pt-16 ${useSidebar ? 'w-3/4' : 'w-full'}`}>
+      <div className={`flex flex-wrap pt-16 ${useSidebar ? 'w-3/4 max-sm:w-3/5' : 'w-full'}`}>
         {/* Current player always shown */}
         {currentPlayer && (
           <div className={`${

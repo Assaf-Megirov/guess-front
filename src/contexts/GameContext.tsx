@@ -5,12 +5,12 @@ import { io, Socket } from 'socket.io-client';
 import { GameStatus } from '@/types/GameStatus';
 import { GameState } from '@/types/GameState';
 import { GameResults } from '@/types/GameResults';
-
+import { toast } from 'sonner';
 const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
 const GAME_NAMESPACE = import.meta.env.VITE_API_GAME_NAMESPACE;
 const SOCKET_URL = `${BASE_SOCKET_URL}/${GAME_NAMESPACE}`;
 
-export type EventName = 'gameStateChanged' | 'opponentMoveInvalid' | 'opponentMoveValid' | 'gameStarted' | 'gameEnded';
+export type EventName = 'gameStateChanged' | 'opponentMoveInvalid' | 'opponentMoveValid' | 'gameStarted' | 'gameEnded' | 'playerRemoved';
 export type EventCallback<T> = (data: T) => void;
 
 export interface ValidMoveResponse{
@@ -48,6 +48,7 @@ interface GameContextType{
     gameInvites: GameInvite[],
     on: <T,>(eventName: EventName, callback: EventCallback<T>) => () => void;
     gameStarted: boolean;
+    gamePaused: boolean;
     connectToGame: () => void;
     cleanContext: () => void;
 }
@@ -58,6 +59,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [gameInvites, setGameInvites] = useState<GameInvite[]>([]);
     const [gameStarted, setGameStarted] = useState<boolean>(false);
     const [allowConnectToGame, setAllowConnectToGame] = useState<boolean>(false);
+    const [gamePaused, setGamePaused] = useState<boolean>(false);
+
 
     const { registerGameInvite, unregisterGameInvite } = useSocial();
     const { token, user, guestId, isAuthenticated } = useAuth();
@@ -77,6 +80,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         gameStarted: new Set(),
         opponentMoveValid: new Set(),
         gameEnded: new Set(),
+        playerRemoved: new Set(),
     });
     const on = useCallback(<T,>(eventName: EventName, callback: EventCallback<T>) => {
         eventListeners.current[eventName].add(callback);
@@ -275,7 +279,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return (
-        <GameContext.Provider value={{gameData, setGameData, gameInitToGameData, write, move, gameInvites, on, gameStarted, connectToGame, cleanContext}}>
+        <GameContext.Provider value={{gameData, setGameData, gameInitToGameData, write, move, gameInvites, on, gameStarted, gamePaused, connectToGame, cleanContext}}>
         {children}
         </GameContext.Provider>
     );

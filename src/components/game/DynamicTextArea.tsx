@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, use } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface DynamicTextareaProps {
     disabled: boolean;
@@ -19,16 +19,24 @@ interface DynamicTextareaProps {
  * @param onEnter - called when the enter key is pressed
  * @param placeholder - placeholder text
  * @param className - className for the textarea
- * @param initialFontSize - initial font size
+ * @param initialFontSize - initial font size (defaults to 48px, or 24px on small screens)
  * @param minFontSize - minimum font size
  */
-const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onChange, onEnter,placeholder, className, initialFontSize, minFontSize }) => {
+const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ 
+  disabled, 
+  value, 
+  onChange, 
+  onEnter,
+  placeholder, 
+  className, 
+  initialFontSize, 
+  minFontSize 
+}) => {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [internalValue, setinternalValue] = useState('');
   const [invalidWord, setInvalidWord] = useState(false);
+  const [currentFontSize, setCurrentFontSize] = useState(initialFontSize || 48);
 
-  if(!initialFontSize) initialFontSize = 48;
-  if(!minFontSize) minFontSize = initialFontSize / 4;
   const defaultClasses =
   'w-full h-full resize-none bg-transparent border-0 text-center font-bold focus:outline-none appearance-none whitespace-nowrap overflow-hidden';
   const combinedClassName = className
@@ -37,17 +45,36 @@ const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onCh
 
   const maxLength = 45; //longest english word
 
+  useEffect(() => {
+    const updateFontSizeForScreenSize = () => {
+      const smallScreenQuery = window.matchMedia('(max-width: 640px)');
+      const baseFontSize = initialFontSize || (smallScreenQuery.matches ? 24 : 48);
+      setCurrentFontSize(baseFontSize);
+      if (textAreaRef.current) {
+        textAreaRef.current.style.fontSize = `${baseFontSize}px`;
+      }
+    };
+
+    updateFontSizeForScreenSize();
+    window.addEventListener('resize', updateFontSizeForScreenSize);
+    return () => {
+      window.removeEventListener('resize', updateFontSizeForScreenSize);
+    };
+  }, [initialFontSize]);
+
   const adjustFontSize = () => {
     const textarea = textAreaRef.current;
     if (!textarea) return;
 
-    textarea.style.fontSize = `${initialFontSize}px`;
-    let fontSize = initialFontSize;
+    textarea.style.fontSize = `${currentFontSize}px`;
+    let fontSize = currentFontSize;
+    
+    const calculatedMinFontSize = minFontSize || currentFontSize / 4;
 
     while (
       (textarea.scrollHeight > textarea.clientHeight ||
         textarea.scrollWidth > textarea.clientWidth) &&
-      fontSize > minFontSize
+      fontSize > calculatedMinFontSize
     ) {
       fontSize -= 1;
       textarea.style.fontSize = `${fontSize}px`;
@@ -125,7 +152,7 @@ const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onCh
     adjustFontSize();
     if(onChange) onChange(internalValue);
     setInvalidWord(false);
-  }, [internalValue]);
+  }, [internalValue, currentFontSize]);
 
   useEffect(() => {
     if(invalidWord){
@@ -151,7 +178,7 @@ const DynamicTextarea: React.FC<DynamicTextareaProps> = ({ disabled, value, onCh
       ref={textAreaRef}
       className={combinedClassName}
       style={{
-        fontSize: `${initialFontSize}px`,
+        fontSize: `${currentFontSize}px`,
         lineHeight: '1.2',
         textAlign: 'center',
         fontWeight: 'bold',

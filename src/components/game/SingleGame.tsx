@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DynamicTextarea from './DynamicTextArea';
 import { validateWord, getNextTierCombos } from '../../api/game';
+import { toast } from 'sonner';
 const POINTS_PER_WORD = 1;
 
 enum GameStatus {
@@ -20,12 +21,10 @@ interface Settings {
 }
 
 const SingleGame: React.FC = () => {
-    //TODO: assuming we have:   validateWord(word: string, letters: string) -> Promise<boolean>
-    //                          getNextTierCombos(letters: string) -> Promise<string[]> (if the string is empty it treats it as 'root', returns an array of combos and we have to choose one randomly)
     const [written, setWritten] = useState('');
     const [letters, setLetters] = useState('');
     const [points, setPoints] = useState(0);
-    const [time, setTime] = useState(0); // in seconds
+    const [time, setTime] = useState(0); //in seconds
     const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
     const [gameStatus, setGameStatus] = useState(GameStatus.SETTINGS);
     const [settings, setSettings] = useState<Settings>({gameDuration: 5*60, letterAddFrequency: 10}); // 5 minutes in seconds
@@ -111,6 +110,23 @@ const SingleGame: React.FC = () => {
             }
         } catch (err) {
             console.error('Error validating word:', err);
+            //show destructive toast to the user and add button to retry or refresh page
+            toast.error(
+                <div className="toast-message">
+                    {err instanceof Error ? err.message : 'An error occurred while validating word'}, you can try again or:
+                </div>,
+                {
+                    action: {
+                        label: 'Refresh Page',
+                        onClick: () => window.location.reload()
+                    },
+                    style: {
+                        maxWidth: '100%',
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word'
+                    }
+                }
+            );
             return false;
         }
     }
@@ -152,11 +168,6 @@ const SingleGame: React.FC = () => {
             letterAddFrequency: frequency
         }));
     }
-
-    //TODO: remove this
-    useEffect(() => {
-        console.log(`settings: ${JSON.stringify(settings)}`);
-    }, [settings]);
 
     useEffect(() => {
         const addLettersIfNeeded = async () => {
@@ -351,15 +362,62 @@ const SingleGame: React.FC = () => {
                 .animate-shake {
                     animation: shake 0.5s ease-in-out;
                 }
+
+                .toast-message {
+                    white-space: normal;
+                    word-break: break-word;
+                    word-wrap: break-word;
+                }
+
+                @media (max-width: 450px) {
+                    :root {
+                        --width: calc(100% - 16px) !important;
+                    }
+                    
+                    [data-sonner-toast] {
+                        max-width: 100% !important;
+                        width: calc(100% - 16px) !important;
+                    }
+                    
+                    [data-sonner-toast] [data-content] {
+                        white-space: normal !important;
+                        word-break: break-word !important;
+                    }
+                    
+                    [data-sonner-toast] [data-button] {
+                        white-space: nowrap !important;
+                    }
+                }
             `}</style>
         </div>
     );
 };
 
 const getLetters = async (letters: string) => {
-    const possibleCombos = await getNextTierCombos(letters);
-    const randomCombo = possibleCombos[Math.floor(Math.random() * possibleCombos.length)];
-    return randomCombo;
+    try{
+        const possibleCombos = await getNextTierCombos(letters);
+        const randomCombo = possibleCombos[Math.floor(Math.random() * possibleCombos.length)];
+        return randomCombo;
+    }catch(err){
+        console.error('Error getting next tier combos:', err);
+        toast.error(
+            <div className="toast-message">
+                Couldn't get your next letters boss, you can restart the game by refreshing the page or continue playing with the letters you have:
+            </div>,
+            {
+                style: {
+                    maxWidth: '100%',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word'
+                }
+            }
+        );
+        if(letters.length > 0){
+            return letters;
+        }
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+        return alphabet.split('')[Math.floor(Math.random() * alphabet.length)];
+    }
 }
 
 export default SingleGame;

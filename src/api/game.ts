@@ -12,12 +12,15 @@ export const validateWord = async (word: string, letters: string) => {
     });
     if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || `Validation failed: ${response.statusText} | for data: ${JSON.stringify({word, letters})}`);
+        if(response.status === 400){
+            return {success: false, reason: error.message};
+        }
+        throw new Error(`We had trouble connecting to the server, error: ${error.message}`);
     }
     try{
         return response.json();
     } catch (error) {
-        throw new Error('Invalid JSON response: ' + error + ' ' + await response.text());
+        throw new Error('We had trouble connecting to the server, error: ' + error + ' ' + await response.text());
     }
 }
 

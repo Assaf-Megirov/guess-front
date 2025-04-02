@@ -58,7 +58,14 @@ const Register: React.FC<RegisterProps> = ({ onSubmit, active, className = '' })
         } else {
           delete newErrors.password;
         }
-        value = formData.confirmPassword;
+        if (formData.confirmPassword) {
+          if (formData.confirmPassword !== value) {
+            newErrors.confirmPassword = ['Passwords do not match'];
+          } else {
+            delete newErrors.confirmPassword;
+          }
+        }
+        break;
       case 'confirmPassword':
         if (!value) {
           newErrors.confirmPassword = ['Please confirm your password'];
