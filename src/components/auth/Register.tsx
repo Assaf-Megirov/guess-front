@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export interface RegisterData {
@@ -10,10 +10,11 @@ export interface RegisterData {
 
 interface RegisterProps {
   onSubmit?: (data: RegisterData) => void;
+  active?: boolean;
   className?: string;
 }
 
-const Register: React.FC<RegisterProps> = ({ onSubmit, className = '' }) => {
+const Register: React.FC<RegisterProps> = ({ onSubmit, active, className = '' }) => {
   const { register, errors, isLoading } = useAuth();
   const [formData, setFormData] = useState<RegisterData>({
     username: '',
@@ -25,6 +26,7 @@ const Register: React.FC<RegisterProps> = ({ onSubmit, className = '' }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
 
   const validateField = (name: keyof RegisterData, value: string) => {
     const newErrors: { [key: string]: string[] } = { ...validationErrors };
@@ -56,7 +58,7 @@ const Register: React.FC<RegisterProps> = ({ onSubmit, className = '' }) => {
         } else {
           delete newErrors.password;
         }
-        break;
+        value = formData.confirmPassword;
       case 'confirmPassword':
         if (!value) {
           newErrors.confirmPassword = ['Please confirm your password'];
@@ -75,24 +77,24 @@ const Register: React.FC<RegisterProps> = ({ onSubmit, className = '' }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    setTouched(prev => ({ ...prev, [name]: true }));
     validateField(name as keyof RegisterData, value);
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
     validateField(name as keyof RegisterData, value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prevent double submission
     if (isSubmitting || isLoading) {
       console.log('Preventing double submission');
       return;
     }
     
-    // Validate all fields
     const isUsernameValid = validateField('username', formData.username);
     const isEmailValid = validateField('email', formData.email);
     const isPasswordValid = validateField('password', formData.password);
@@ -102,7 +104,6 @@ const Register: React.FC<RegisterProps> = ({ onSubmit, className = '' }) => {
       setIsSubmitting(true);
       try {
         await register(formData);
-        // Only call onSubmit if registration was successful and there are no errors
         if (!errors) {
           onSubmit?.(formData);
         }
@@ -117,9 +118,31 @@ const Register: React.FC<RegisterProps> = ({ onSubmit, className = '' }) => {
   const getFieldErrors = (fieldName: string): string[] => {
     return [
       ...(validationErrors[fieldName] || []),
-      ...(errors?.[fieldName] || [])
+      ...(touched[fieldName as keyof typeof touched] ? [] : (errors?.[fieldName] || []))
     ];
   };
+
+  useEffect(() => {
+    setTouched(prev => ({ 
+      ...prev, 
+      username: false,
+      email: false, 
+      password: false,
+      confirmPassword: false 
+    }));
+  }, [errors]);
+
+  useEffect(() => {
+    if (active) {
+      setTouched(prev => ({ 
+        ...prev, 
+        username: true,
+        email: true,
+        password: true,
+        confirmPassword: true
+      }));
+    }
+  }, [active]);
 
   return (
     <form onSubmit={handleSubmit} className={className} style={{ width: '100%', maxWidth: '400px', margin: '0 auto' }}>

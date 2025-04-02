@@ -25,7 +25,8 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.message || 'Login failed');
+    console.log(error);
+    return error || {general: ['Login failed, please try again.']};
   }
   return response.json();
 };
@@ -49,7 +50,8 @@ export const register = async (data: RegisterData): Promise<AuthResponse> => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Registration failed');
+        console.log(error);
+        return error || {general: ['Registration failed, please try again.']};
       }
 
       const result = await response.json();
@@ -73,7 +75,9 @@ export const logout = async (token: string): Promise<void> => {
   });
 
   if (!response.ok) {
-    throw new Error('Logout failed');
+    const error = await response.json();
+    console.log(error);
+    return error || {general: ['Logout failed, please try again.']};
   }
 }; 
 

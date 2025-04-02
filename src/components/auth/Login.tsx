@@ -1,8 +1,9 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface LoginProps {
   onSubmit?: (data: LoginData) => void;
+  active?: boolean;
   className?: string;
 }
 
@@ -12,7 +13,7 @@ export interface LoginData {
   rememberMe: boolean;
 }
 
-const Login: React.FC<LoginProps> = ({ onSubmit }) => {
+const Login: React.FC<LoginProps> = ({ onSubmit, active }) => {
   const { login, errors, isLoading } = useAuth();
   const [formData, setFormData] = useState<LoginData>({
     email: '',
@@ -83,9 +84,19 @@ const Login: React.FC<LoginProps> = ({ onSubmit }) => {
   const getFieldErrors = (fieldName: string): string[] => {
     return [
       ...(validationErrors[fieldName] || []),
-      ...(errors?.[fieldName] || [])
+      ...(touched[fieldName as keyof typeof touched] ? [] : (errors?.[fieldName] || []))
     ];
   };
+
+  useEffect(() => {
+    setTouched(prev => ({ ...prev, email: false, password: false }));
+  }, [errors]);
+
+  useEffect(() => {
+    if (active) {
+      setTouched(prev => ({ ...prev, email: true, password: true }));
+    }
+  }, [active]);
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);

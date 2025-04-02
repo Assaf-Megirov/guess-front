@@ -14,22 +14,30 @@ import Game from './components/game/Game';
 import GameInvites from './components/game/GameInvites';
 import Index from './components/Index';
 import SingleGame from './components/game/SingleGame';
+
 function App() {
   return (
-    <AuthProvider>
-      <Toaster/>
-      <SocialProvider>
-        <GameProvider>
-          <Router>
-          <AuthRedirect />
-          <GameRedirect />
-            <div className="flex">
-              <Sidebar/>
+    <Router>
+      <AuthProvider>
+        <Toaster/>
+        <SocialProvider>
+          <GameProvider>
+            <AuthRedirect />
+            <GameRedirect />
+            <div className="flex justify-center w-full">
+              <Sidebar className="z-20"/>
 
-              <div className="flex-1 p-6 bg-gray-100">
+              <div className="w-full bg-gray-100 p-4 sm:p-6 rounded-lg 
+                  sm:ml-4 
+                  sm:w-4/5 
+                  md:w-3/4 
+                  lg:w-2/3 
+                  xl:w-1/2 
+                  z-10
+                  transition-all duration-300">
                 <Routes>
                   <Route path='/auth' element={<AuthPage/>} />
-                  <Route path='/' element={
+                  <Route path='/home' element={
                     <PrivateRoute>
                       <Home />
                     </PrivateRoute>
@@ -52,7 +60,7 @@ function App() {
                       <GameInvites />
                     </PrivateRoute>
                   }/>
-                  <Route path='/index' element={
+                  <Route path='/' element={
                       <Index />
                   }/>
                   <Route path='/singleGame' element={
@@ -61,10 +69,10 @@ function App() {
                 </Routes>
               </div>
             </div>
-          </Router>
-        </GameProvider>
-      </SocialProvider>
-    </AuthProvider>
+          </GameProvider>
+        </SocialProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
@@ -75,7 +83,7 @@ function AuthRedirect() {
 
   useEffect(() => {
     if (isAuthenticated && location.pathname === '/auth') {
-      navigate('/');
+      navigate('/home');
     }
   }, [isAuthenticated, navigate]);
 

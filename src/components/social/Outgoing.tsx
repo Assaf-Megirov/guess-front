@@ -66,7 +66,7 @@ const Outgoing: React.FC = () => {
 
     return (
         <div className="p-6 bg-gray-100 min-h-screen">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Incoming Friend Requests</h2>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Outgoing Friend Requests</h2>
             {requests && requests.length > 0 ? (
                 <ul className="space-y-4">
                     {requests.map((sender) => (
@@ -90,7 +90,7 @@ const Outgoing: React.FC = () => {
                     ))}
                 </ul>
             ) : (
-                <p className="text-gray-600">No incoming friend requests.</p>
+                <p className="text-gray-600">No outgoing friend requests.</p>
             )}
         </div>
     );

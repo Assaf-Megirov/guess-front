@@ -159,14 +159,14 @@ const AuthPage: React.FC<AuthPageProps> = ({
           ...getFormStyle('login'),
           pointerEvents: (isAnimating ? targetTab : activeTab) === 'login' ? 'auto' : 'none'
         }}>
-          <Login onSubmit={handleLoginSubmit} />
+          <Login onSubmit={handleLoginSubmit} active={activeTab === 'login'} />
         </div>
         
         <div style={{
           ...getFormStyle('register'), 
           pointerEvents: (isAnimating ? targetTab : activeTab) === 'register' ? 'auto' : 'none'
         }}>
-          <Register onSubmit={handleRegisterSubmit} />
+          <Register onSubmit={handleRegisterSubmit} active={activeTab === 'register'} />
         </div>
       </div>
 

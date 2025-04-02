@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
       console.log('AuthContext: User authenticated from localStorage');
     }
-    setIsInitialized(true); // Mark initialization as complete
+    setIsInitialized(true);
   }, []);
 
   useEffect(() => {
@@ -67,7 +67,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [isAuthenticated]);
 
-  const handleAuthResponse = (response: { token: string; user: User }) => {
+  const handleAuthResponse = (response: { token: string; user: User } | { errors: FieldErrors }) => {
+    if('errors' in response){
+      console.log('AuthContext: Error response received', response.errors);
+      setErrors(response.errors);
+      setError(null);
+      return;
+    }
     setToken(response.token);
     setUser(response.user);
     setErrors(null);
@@ -150,7 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login: handleLogin,
         register: handleRegister,
         logout: handleLogout,
-        isInitialized, // Expose the new state
+        isInitialized,
       }}
     >
       {children}

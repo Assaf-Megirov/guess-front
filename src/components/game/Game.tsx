@@ -214,9 +214,9 @@ const Game: React.FC = () => {
 
   const handleHome = () => {
     if(isAuthenticated){
-      navigate('/');
+      navigate('/home');
     } else {
-      navigate('/index');
+      navigate('/');
     }
     cleanContext();
   }

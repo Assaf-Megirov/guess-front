@@ -6,9 +6,11 @@ import { User } from '@/types/User';
 import { useSocial } from '@/contexts/SocialContext';
 import { toast } from 'sonner';
 import { acceptFriendRequest } from '@/api/friends';
+import { useNavigate } from 'react-router-dom';
 
 const Home: React.FC = () => {
   const { user, token, logout } = useAuth();
+  const navigate = useNavigate();
   const [friends, setFriends] = useState<User[]>();
   const [suggestions, setSuggestions] = useState<User[]>();
 
@@ -140,6 +142,11 @@ const Home: React.FC = () => {
     getUserFriendSuggestions();
   }, []);
 
+  const handleLogout = () => {
+    logout();
+    navigate('/auth');
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md p-6">
@@ -148,7 +155,7 @@ const Home: React.FC = () => {
             Welcome, {user.username}!
           </h1>
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
           >
             Logout
