@@ -1,11 +1,10 @@
-import React, { createContext, useState, useContext, use, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { GameInit, GameInvite, useSocial } from './SocialContext';
 import { useAuth } from './AuthContext';
 import { io, Socket } from 'socket.io-client';
 import { GameStatus } from '@/types/GameStatus';
 import { GameState } from '@/types/GameState';
 import { GameResults } from '@/types/GameResults';
-import { toast } from 'sonner';
 const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
 const GAME_NAMESPACE = import.meta.env.VITE_API_GAME_NAMESPACE;
 const SOCKET_URL = `${BASE_SOCKET_URL}/${GAME_NAMESPACE}`;
@@ -67,9 +66,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log(`GameProvider initialized, user is ${JSON.stringify(user)}, userId is ${user?.id}`);
     const socketRef = React.useRef<Socket | null>(null);
     const userId = isAuthenticated ? user?.id : guestId;
+    
     // Add effect to track user changes
     useEffect(() => {
         console.log('User state changed in GameProvider:', JSON.stringify(user));
+        setGamePaused(false);
     }, [user]);
 
     const eventListeners = useRef<{
@@ -97,6 +98,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleInvite = (userId: string, username: string) => {
         setGameInvites(prevInvites => [...prevInvites, {senderId: userId, senderUsername: username}]);
     }
+    
+    const removeGameInvite = (userId: string | undefined) => {
+        if(!userId) return;
+        setGameInvites(prevInvites => prevInvites.filter(invite => invite.senderId !== userId));
+    }
+    
     useEffect(() => {
         registerGameInvite(handleInvite);
         return () => unregisterGameInvite(handleInvite);
@@ -122,7 +129,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('gameData?.gameId: ', gameData?.gameId);
             if(data.gameId === gameData?.gameId){
                 console.log('Game has started');
-                gameData.status = GameStatus.InProgress;
+                // Create a new gameData object instead of mutating the existing one
+                const updatedGameData = {
+                    ...gameData,
+                    status: GameStatus.InProgress
+                };
+                setGameData(updatedGameData);
                 setGameStarted(true);
                 emit('gameStarted', data);
                 removeGameInvite(gameData.opponents.find(opponent => opponent.userId !== userId)?.userId);
@@ -164,7 +176,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => {
             socket.disconnect();
         };
-    }, [token, gameData, user, guestId, isAuthenticated, allowConnectToGame]);
+    }, [token, gameData?.gameId, user, guestId, isAuthenticated, allowConnectToGame, userId, emit, removeGameInvite]);
 
     const gameInitToGameData = (gameInitData: GameInit): GameData => { //TODO: currently not modifying to use guestId as this function is not used in the lobby
         console.log('gameInitToGameData called with user:', JSON.stringify(user));
@@ -236,7 +248,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             socketRef.current.on('invalid', handleInvalid);
             socketRef.current.emit('move', word);
     
-            const timeout = setTimeout(() => {
+            setTimeout(() => {
                 cleanup();
                 reject(new Error('Move response timed out'));
             }, 5000);
@@ -245,20 +257,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const updateGameData = (gameState: GameState) => {
         if(gameState.id !== gameData?.gameId) throw new Error(`gameId mismatch in updateGameData: ${gameState.id} !== ${gameData?.gameId}`);
-        gameData.status = gameState.state;
-        gameData.elapsedTime = gameState.elapsedTime;
+        
+        // Create a new gameData object instead of mutating the existing one
+        const updatedGameData = {
+            ...gameData,
+            status: gameState.state,
+            elapsedTime: gameState.elapsedTime,
+            opponents: [...gameData.opponents]
+        };
+        
         if(gameState.state === GameStatus.InProgress){
-            console.log(`gameData (client side data): ${JSON.stringify(gameData)}`);
-            gameState.playerData.forEach((playerData, playerId) => {
-                const opponent = gameData.opponents.find(opponent => opponent.userId === playerId);
-                if(!opponent) throw new Error(`could not find opponent with id ${playerId} in updateGameData`);
-                opponent.points = playerData.points;
-                opponent.letters = playerData.letters;
-                opponent.written = playerData.written;
-                opponent.words = playerData.words;
-                opponent.username = playerData.username;
-            })
+            console.log(`gameData (client side data): ${JSON.stringify(updatedGameData)}`);
+            
+            // Create a new opponents array with updated data
+            updatedGameData.opponents = gameData.opponents.map(opponent => {
+                const playerData = gameState.playerData.get(opponent.userId);
+                if (playerData) {
+                    return {
+                        ...opponent,
+                        points: playerData.points,
+                        letters: playerData.letters,
+                        written: playerData.written,
+                        words: playerData.words,
+                        username: playerData.username
+                    };
+                }
+                return opponent;
+            });
         }
+        
+        // Update the state with the new object
+        setGameData(updatedGameData);
     }
 
     const connectToGame = () => {
@@ -271,11 +300,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setGameStarted(false);
         setAllowConnectToGame(false);
         socketRef.current?.disconnect();
-    }
-
-    const removeGameInvite = (userId: string | undefined) => {
-        if(!userId) return;
-        setGameInvites(prevInvites => prevInvites.filter(invite => invite.senderId !== userId));
     }
 
     return (

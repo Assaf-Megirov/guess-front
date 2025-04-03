@@ -6,6 +6,7 @@ import { useGame } from '../contexts/GameContext';
 import { GameStatus } from '@/types/GameStatus';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import Header from './Header';
 const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
 const LOBBY_NAMESPACE = import.meta.env.VITE_API_LOBBY_NAMESPACE;
 const SOCKET_URL = `${BASE_SOCKET_URL}/${LOBBY_NAMESPACE}`;
@@ -80,7 +81,7 @@ const Index: React.FC<IndexProps> = () => {
         return () => {
             socket.disconnect();
         };
-    }, [guestId, user]);
+    }, [guestId, user, isGuest, setGameData, connectToGame, navigate]);
 
     useEffect(() => {
         const storedGameCode = localStorage.getItem('lobbyCode');
@@ -238,7 +239,7 @@ const Index: React.FC<IndexProps> = () => {
         return <Lobby lobby={lobby} userId={userId} onReady={onReady} onUnready={onUnready} onStart={onStart} onLeave={onLeave} />
     }
     return (
-        <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
         <h1 className="text-4xl font-bold mb-8">Index</h1>
         {usernameError && (
           <div className="w-64 mb-1">
@@ -290,6 +291,7 @@ const Index: React.FC<IndexProps> = () => {
             > Join Game </button>
             </div>
         </div>
+        <Header />
         </div>
     );
 };

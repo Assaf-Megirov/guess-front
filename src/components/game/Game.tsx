@@ -55,6 +55,7 @@ const Game: React.FC = () => {
       setTime((prevTime) => prevTime + 1);
     }, 1000);
     setIntervalId(id);
+    console.log(intervalId);
     return () => clearInterval(id);
   }, []);
   
@@ -218,7 +219,7 @@ const Game: React.FC = () => {
       unsubGameEnded();
       unsubPlayerRemoved();
     } 
-  }, [on]);
+  }, [on, handleGameStateChange, handleOpponentMoveInvalid, handleOpponentMoveValid, handleGameStarted, handleGameEnded, handlePlayerRemoved]);
 
   const handleHome = () => {
     if(isAuthenticated){
