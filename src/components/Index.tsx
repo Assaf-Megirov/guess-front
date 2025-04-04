@@ -240,6 +240,9 @@ const Index: React.FC<IndexProps> = () => {
     }
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+        <p className="mb-4 text-center text-2xl font-bold">
+        you can also <a href="/singleGame" className="text-blue-500 underline">play alone</a>
+        </p>
         <h1 className="text-4xl font-bold mb-8">Index</h1>
         {usernameError && (
           <div className="w-64 mb-1">

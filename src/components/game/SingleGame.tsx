@@ -93,7 +93,12 @@ const SingleGame: React.FC = () => {
         if (!word.trim()) return false;
         console.log(`frequency when moving: ${settings.letterAddFrequency}`);
         try {
-            const res: MoveResponse = await validateWord(word, letters);
+            let res: MoveResponse;
+            if(words.includes(word)){
+                res = {success: false, reason: 'You already used this word'};
+            }else{
+                res = await validateWord(word, letters);
+            }
             if (res.success) {
                 triggerAnimation('points');
                 triggerAnimation('valid');
@@ -197,6 +202,9 @@ const SingleGame: React.FC = () => {
 
     const renderSettingsScreen = () => (
         <div className="flex flex-col items-center justify-center h-full bg-gray-50 p-4">
+            <p className="mb-4 text-center text-2xl font-bold">
+            you can also <a href="/" className="text-blue-500 underline">play with friends</a>
+            </p>
             <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
                 <h1 className="text-3xl font-bold mb-6 text-center text-indigo-600">Game Settings</h1>
                 

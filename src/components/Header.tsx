@@ -14,16 +14,33 @@ const Header: React.FC = () => {
         {/* How To Section */}
         <div className="flex flex-col items-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 text-center">How To</h2>
-          <ul className="list-disc list-inside text-s md:text-base text-center space-y-1 md:space-y-2">
-            <li>Enter a username and create a game (lobby); an invite code will be displayed above.</li>
-            <li>To join a game, enter a username and the invite code, then click "Join Game".</li>
-            <li>When you're ready, press "Ready".</li>
-            <li>The game starts when either all players are ready or the game creator presses "Start".</li>
-            <li>Every player gets a letter and must type words (press Enter to submit) that include that letter.</li>
-            <li>Earn points for every valid word you submit.</li>
-            <li>If a player scores more than 10 points, everyone gets an additional letter to use.</li>
-            <li>The game ends when the timer runs out, and the player with the most points wins.</li>
-          </ul>
+          <div className="text-sm md:text-base max-w-lg">
+            <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2">
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">1</div>
+              <div>Enter a username and create a game (lobby); an invite code will be displayed above.</div>
+              
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">2</div>
+              <div>To join a game, enter a username and the invite code, then click "Join Game".</div>
+              
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">3</div>
+              <div>When you're ready, press "Ready".</div>
+              
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">4</div>
+              <div>The game starts when either all players are ready or the game creator presses "Start".</div>
+              
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">5</div>
+              <div>Every player gets a letter and must type words (press Enter to submit) that include that letter.</div>
+              
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">6</div>
+              <div>Earn points for every valid word you submit.</div>
+              
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">7</div>
+              <div>If a player scores more than 10 points, everyone gets an additional letter to use.</div>
+              
+              <div className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-medium">8</div>
+              <div>The game ends when the timer runs out, and the player with the most points wins.</div>
+            </div>
+          </div>
         </div>
       </div>
     </header>
