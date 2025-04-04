@@ -1,11 +1,10 @@
-import React, { createContext, useState, useContext, use, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { GameInit, GameInvite, useSocial } from './SocialContext';
 import { useAuth } from './AuthContext';
 import { io, Socket } from 'socket.io-client';
 import { GameStatus } from '@/types/GameStatus';
 import { GameState } from '@/types/GameState';
 import { GameResults } from '@/types/GameResults';
-import { toast } from 'sonner';
 const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
 const GAME_NAMESPACE = import.meta.env.VITE_API_GAME_NAMESPACE;
 const SOCKET_URL = `${BASE_SOCKET_URL}/${GAME_NAMESPACE}`;
@@ -70,6 +69,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Add effect to track user changes
     useEffect(() => {
         console.log('User state changed in GameProvider:', JSON.stringify(user));
+        setGamePaused(false);
     }, [user]);
 
     const eventListeners = useRef<{
@@ -230,6 +230,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const cleanup = () => {
                 socketRef.current?.off('valid', handleValid);
                 socketRef.current?.off('invalid', handleInvalid);
+                clearTimeout(timeout);
             };
     
             socketRef.current.on('valid', handleValid);
