@@ -9,7 +9,7 @@ const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
 const GAME_NAMESPACE = import.meta.env.VITE_API_GAME_NAMESPACE;
 const SOCKET_URL = `${BASE_SOCKET_URL}/${GAME_NAMESPACE}`;
 
-export type EventName = 'gameStateChanged' | 'opponentMoveInvalid' | 'opponentMoveValid' | 'gameStarted' | 'gameEnded' | 'playerRemoved';
+export type EventName = 'gameStateChanged' | 'opponentMoveInvalid' | 'opponentMoveValid' | 'gameStarted' | 'gameEnded' | 'gamePaused' | 'gameResumed' | 'playerRemoved';
 export type EventCallback<T> = (data: T) => void;
 
 export interface ValidMoveResponse{
@@ -24,6 +24,21 @@ export interface MoveResponse{
     success: boolean;
     reason?: string;
 }
+export interface GamePausedData{
+    reason: string; //waiting for opponent | admin paused
+    playerId?: string; //if waiting for opponent, this is the opponent that we are waiting for and if its admin paused this is the admin
+    username?: string;
+}
+export interface GameResumedData{
+    outcome: string; //opponent timed out | opponent reconnected | admin resumed
+    playerId?: string;
+    username?: string;
+}
+export interface PlayerLeftData{
+    reason: string; //opponent left | admin left
+    playerId?: string;
+    username?: string;
+}
 
 export interface GameData{
     gameId: string;
@@ -34,6 +49,7 @@ export interface GameData{
         written: string;
         points: number;
         words: string[];
+        isPlaying: boolean;
     }[];
     status: GameStatus;
     elapsedTime: number;
@@ -66,7 +82,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log(`GameProvider initialized, user is ${JSON.stringify(user)}, userId is ${user?.id}`);
     const socketRef = React.useRef<Socket | null>(null);
     const userId = isAuthenticated ? user?.id : guestId;
-    // Add effect to track user changes
     useEffect(() => {
         console.log('User state changed in GameProvider:', JSON.stringify(user));
         setGamePaused(false);
@@ -80,7 +95,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         gameStarted: new Set(),
         opponentMoveValid: new Set(),
         gameEnded: new Set(),
-        playerRemoved: new Set(),
+        gamePaused: new Set(),
+        gameResumed: new Set(),
+        playerRemoved: new Set(),//this is for cases that someone issues a disconnect or leave game event (there is not pause thats why its seperate)
     });
     const on = useCallback(<T,>(eventName: EventName, callback: EventCallback<T>) => {
         eventListeners.current[eventName].add(callback);
@@ -137,6 +154,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ...data,
                 playerData: Array.from(data.playerData.entries())
             })}`);
+            console.log(`Data received from server: ${JSON.stringify(data)}`);
             updateGameData(data);
             emit('gameStateChanged', data);
         });
@@ -152,6 +170,27 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if(data.by === userId) return; //this was our move and it was handled (we assume)
             console.log('Opponent made valid move');
             emit('opponentMoveValid', data); //data: ValidMoveResponse
+        });
+
+        socket.on('game_paused', (data: GamePausedData) => {
+            console.log('game_paused event received with data: ', data);
+            setGamePaused(true);
+            emit('gamePaused', data);
+        });
+
+        socket.on('game_resumed', (data: GamePausedData) => {
+            console.log('game_resumed event received with data: ', data);
+            setGamePaused(false);
+            if(data.reason === 'player_left'){
+                emit('playerRemoved', data);
+            }else{
+                emit('gameResumed', data);
+            }
+        });
+
+        socket.on('player_left', (data: PlayerLeftData) => {
+            console.log('player_left event received with data: ', data);
+            emit('playerRemoved', data);
         });
 
         socket.on('game_ended', (results: GameResults) => {
@@ -180,6 +219,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             letters: '',
             written: '',
             words: [],
+            isPlaying: false,
         }
         console.log('Created userData:', JSON.stringify(userData));
         const playerDataMap = gameInitData.opponents.map(opponent => ({
@@ -189,6 +229,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             letters: '',
             written: '',
             words: [],
+            isPlaying: false,
         }))
         playerDataMap.push(userData);
         const res: GameData = {
@@ -258,6 +299,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 opponent.written = playerData.written;
                 opponent.words = playerData.words;
                 opponent.username = playerData.username;
+                opponent.isPlaying = playerData.isPlaying;
             })
         }
     }

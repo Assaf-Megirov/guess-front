@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import DynamicTextarea from './DynamicTextArea';
-import { InvalidMoveResponse, MoveResponse, useGame, ValidMoveResponse } from '@/contexts/GameContext';
+import { GamePausedData, GameResumedData, InvalidMoveResponse, MoveResponse, PlayerLeftData, useGame, ValidMoveResponse } from '@/contexts/GameContext';
 import { GameStatus } from '@/types/GameStatus';
 import { GameState } from '@/types/GameState';
 import { useAuth } from '@/contexts/AuthContext';
 import { GameResults } from '@/types/GameResults';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 interface PlayerData {
   id: string;
@@ -17,6 +26,7 @@ interface PlayerData {
   words: string[];
   previousRank?: number;
   currentRank?: number;
+  isPlaying: boolean;
 }
 
 interface AnimationState {
@@ -39,8 +49,10 @@ const Game: React.FC = () => {
   const [playerErrors, setPlayerErrors] = useState<PlayerError>({});
   const [animation, setAnimation] = useState<AnimationState>({});
   const [rankChanges, setRankChanges] = useState<{[playerId: string]: 'up' | 'down' | null}>({});
+  const [gamePaused, setGamePaused] = useState(false);
+  const [showAloneDialog, setShowAloneDialog] = useState(false);
 
-  const { move, write, on, gameData, gameStarted, gamePaused, connectToGame, cleanContext, setGameData } = useGame();
+  const { move, write, on, gameData, gameStarted, connectToGame, cleanContext, setGameData } = useGame();
   const { user, guestId, isAuthenticated } = useAuth();
   const userId = isAuthenticated ? user?.id : guestId;
   const navigate = useNavigate();
@@ -108,6 +120,7 @@ const Game: React.FC = () => {
     setTime(gameData?.elapsedTime || 0);
     
     const playerEntries = Array.from(data.playerData.entries());
+    console.log(`Player entries: ${JSON.stringify(playerEntries)}`);
     const sortedPlayers: PlayerData[] = playerEntries
       .map(([playerId, playerData]) => ({
         id: playerId,
@@ -116,6 +129,7 @@ const Game: React.FC = () => {
         letters: playerData.letters,
         written: playerData.written,
         words: playerData.words,
+        isPlaying: playerData.isPlaying,
       }))
       .sort((a, b) => b.points - a.points);
     
@@ -142,6 +156,7 @@ const Game: React.FC = () => {
       setRankChanges({});
     }, 2000);
     
+    console.log(`Sorted players: ${JSON.stringify(sortedPlayers)}`);
     setPlayers(sortedPlayers);
   }
   
@@ -178,10 +193,42 @@ const Game: React.FC = () => {
     setResults(results);
   }
 
-  const handlePlayerRemoved = (data: {playerId: string, username: string, reason: string}) => {
+  const handlePlayerRemoved = (data: PlayerLeftData) => {
     console.log(`${data.username} removed from game: ${data.reason}`);
-    //show toast to the user
     toast.error(`${data.username} removed from game: ${data.reason}`);
+    //TODO: handle case where the user is alone in the game now
+    //show dialog to the player to either continue playing alone or leave the game
+    const playersPlaying = players.filter(player => player.isPlaying).length;
+    console.log(`Players playing: ${playersPlaying}`);
+    console.log(`Players: ${JSON.stringify(players)}`);
+    console.log(`players length: ${players.length}`);
+    if(playersPlaying === 1){
+      setGamePaused(true);
+      console.log('Showing alone dialog');
+      setShowAloneDialog(true);
+    }else{
+      console.log('Not showing alone dialog');
+      setGamePaused(false);
+    }
+  }
+  const handleContinuePlaying = () => {
+    setGamePaused(false);
+    setShowAloneDialog(false);
+  }
+
+  const handleLeaveGame = () => {
+    cleanContext();
+    navigate('/');
+  }
+
+  const handleGamePaused = (data: GamePausedData) => {
+    console.log(`Game paused: ${data}`);
+    setGamePaused(true);
+  }
+
+  const handleGameResumed = (data: GameResumedData) => {
+    console.log(`Game resumed: ${data}`);
+    setGamePaused(false);
   }
   
   useEffect(() => {
@@ -205,11 +252,18 @@ const Game: React.FC = () => {
       console.log(`Game ended: ${results}`);
       handleGameEnded(results);
     });
-    const unsubPlayerRemoved = on('playerRemoved', (data: {playerId: string, username: string, reason: string}) => {
+    const unsubPlayerRemoved = on('playerRemoved', (data: PlayerLeftData) => {
       console.log(`${data.username} removed from game: ${data.reason}`);
       handlePlayerRemoved(data);
     });
-
+    const unsubGamePaused = on('gamePaused', (data: GamePausedData) => {
+      console.log(`Game paused: ${data}`);
+      handleGamePaused(data);
+    });
+    const unsubGameResumed = on('gameResumed', (data: GameResumedData) => {
+      console.log(`Game resumed: ${data}`);
+      handleGameResumed(data);
+    });
 
     return () => {
       unsubGameStateChange();
@@ -218,8 +272,10 @@ const Game: React.FC = () => {
       unsubGameStarted();
       unsubGameEnded();
       unsubPlayerRemoved();
+      unsubGamePaused();
+      unsubGameResumed();
     } 
-  }, [on, handleGameStateChange, handleOpponentMoveInvalid, handleOpponentMoveValid, handleGameStarted, handleGameEnded, handlePlayerRemoved]);
+  }, [on, handleGameStateChange, handleOpponentMoveInvalid, handleOpponentMoveValid, handleGameStarted, handleGameEnded, handlePlayerRemoved, handleGamePaused, handleGameResumed]);
 
   const handleHome = () => {
     if(isAuthenticated){
@@ -446,7 +502,7 @@ const Game: React.FC = () => {
     );
   };
 
-  if (gamePaused) {
+  if (gamePaused && !showAloneDialog) {
     return (
       <div className="relative w-full h-screen">
         {/* Blurred game UI in background */}
@@ -511,6 +567,18 @@ const Game: React.FC = () => {
 
   return (
     <div className="flex w-full h-screen bg-gray-50 relative">
+      <Dialog open={showAloneDialog} onOpenChange={setShowAloneDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>All other players left the game</DialogTitle>
+            <DialogDescription>
+              You can either continue playing alone or leave the game
+            </DialogDescription>
+          </DialogHeader>
+          <Button onClick={handleContinuePlaying}>Continue Playing</Button>
+          <Button variant="destructive" onClick={handleLeaveGame}>Leave Game</Button>
+        </DialogContent>
+      </Dialog>
       <div className="fixed top-0 left-1/2 transform -translate-x-1/2 z-10">
         <div className="text-4xl font-bold text-red-600 bg-white rounded-b-lg shadow-md px-6 py-2 border-b-2 border-l-2 border-r-2 border-gray-300">
           {formattedTime}

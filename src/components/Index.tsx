@@ -67,8 +67,8 @@ const Index: React.FC<IndexProps> = () => {
             const {gameId} = data;
             const currentLobby = lobbyRef.current;
             console.log(`lobby from ref: ${JSON.stringify(currentLobby)}`);
-            console.log(`lobby.players mapped to opponents: ${JSON.stringify(currentLobby?.players.map(player => ({userId: player.id, username: player.username, letters: '', written: '', points: 0, words: []})))}`);
-            setGameData({gameId: gameId, opponents: currentLobby?.players.map(player => ({userId: player.id, username: player.username, letters: '', written: '', points: 0, words: []})) || [], status: GameStatus.NotStarted, elapsedTime: 0});
+            console.log(`lobby.players mapped to opponents: ${JSON.stringify(currentLobby?.players.map(player => ({userId: player.id, username: player.username, letters: '', written: '', points: 0, words: [], isPlaying: false})))}`);
+            setGameData({gameId: gameId, opponents: currentLobby?.players.map(player => ({userId: player.id, username: player.username, letters: '', written: '', points: 0, words: [], isPlaying: false})) || [], status: GameStatus.NotStarted, elapsedTime: 0});
             connectToGame();
             console.log(`Game started: ${JSON.stringify(data, null, 2)}`);
             navigate('/game');
@@ -142,7 +142,7 @@ const Index: React.FC<IndexProps> = () => {
                 const usernameToUse = usernameOverride || (isGuest ? username : user?.username);
                 console.log(`Socket connected, joining lobby with code: ${codeToUse} and username: ${usernameToUse}`);
                 socket.emit('join_lobby', {
-                    code: codeToUse,
+                    code: codeToUse.toLowerCase(),
                     username: usernameToUse,
                 });
             }
@@ -185,7 +185,7 @@ const Index: React.FC<IndexProps> = () => {
         console.log(`username state: ${username}`);
         console.log(`joining lobby with code: ${codeToUse} and username: ${usernameToUse}`);
         socket.emit('join_lobby', {
-            code: codeToUse,
+            code: codeToUse.toLowerCase(),
             username: usernameToUse,
         });
     }
@@ -217,6 +217,9 @@ const Index: React.FC<IndexProps> = () => {
             console.error('Socket not initialized');
             return;
         }
+        socket.on('not_enough_players', () => {
+            toast.error('Not enough players to start the game, you can leave the lobby and play alone');
+        });
         const playerId = isGuest ? guestId : user?.id;
         socket.emit('start_game', {code: lobby?.code, playerId: playerId});
     }

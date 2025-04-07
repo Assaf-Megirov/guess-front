@@ -10,6 +10,7 @@ export interface GameState {
       written: string;
       words: string[];
       username: string;
+      isPlaying: boolean;
     }>;
     elapsedTime: number;
   }
