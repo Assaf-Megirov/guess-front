@@ -7,11 +7,11 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { isAuthenticated, isInitialized } = useAuth(); // Assuming `useAuth` provides `isAuthenticated` and `isInitialized`
+  const { isAuthenticated, isInitialized } = useAuth();
     console.log('in private route, auth is: ', isAuthenticated);
 
   if (!isInitialized) {
-    return null; // Or a loading spinner
+    return null;
   }
 
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;

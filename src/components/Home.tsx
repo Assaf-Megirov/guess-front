@@ -101,7 +101,6 @@ const Home: React.FC = () => {
     registerFriendRequestAccepted(onFriendRequestAccepted);
     registerFriendRequestReceived(onFriendRequestRecieved);
 
-    // Cleanup function to avoid memory leaks
     return () => {
       unregisterFriendsListUpdate(onUpdate);
       unregisterFriendRequestAccepted(onFriendRequestAccepted);

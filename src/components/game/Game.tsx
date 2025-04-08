@@ -1,48 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import DynamicTextarea from './DynamicTextArea';
 import { GamePausedData, GameResumedData, InvalidMoveResponse, MoveResponse, PlayerLeftData, useGame, ValidMoveResponse } from '@/contexts/GameContext';
 import { GameStatus } from '@/types/GameStatus';
 import { GameState } from '@/types/GameState';
+import { PlayerData } from '@/types/PlayerData';
 import { useAuth } from '@/contexts/AuthContext';
 import { GameResults } from '@/types/GameResults';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import GameHeader from './GameHeader';
+import GameResultsPanel from './GameResultsPanel';
+import GameDialogs from './GameDialogs';
+import PlayerError from '@/types/PlayerErrors';
+import AnimationState from '@/types/AnimationState';
+import GameContent from './GameContent';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-
-interface PlayerData {
-  id: string;
-  username: string;
-  points: number;
-  letters: string;
-  written: string;
-  words: string[];
-  previousRank?: number;
-  currentRank?: number;
-  isPlaying: boolean;
-}
-
-interface AnimationState {
-  [playerId: string]: {
-    valid: boolean;
-    invalid: boolean;
-    points: boolean;
-  };
-}
-
-interface PlayerError {
-  [playerId: string]: string | null;
-}
 
 const Game: React.FC = () => {
-  const [time, setTime] = useState(0); // in seconds
+  const [time, setTime] = useState(0); //in seconds
   const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const [results, setResults] = useState<GameResults | null>(null);
@@ -70,8 +44,6 @@ const Game: React.FC = () => {
     console.log(intervalId);
     return () => clearInterval(id);
   }, []);
-  
-  const formattedTime = `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`;
 
   const triggerAnimation = (type: 'valid' | 'invalid' | 'points', playerId: string) => {
     setAnimation(prev => ({
@@ -115,7 +87,7 @@ const Game: React.FC = () => {
     console.log(word);
   }
 
-  const handleGameStateChange = (data: GameState) => {
+  const handleGameStateChange = (data: GameState) => { //sets rankChanges and players[]
     console.log('Game state changed');
     setTime(gameData?.elapsedTime || 0);
     
@@ -302,20 +274,6 @@ const Game: React.FC = () => {
     connectToGame();
   }
 
-  const getPlayersByRank = (results: GameResults) => {
-    return Object.entries(results.scores)
-      .map(([playerId, score]) => {
-        const player = players.find(p => p.id === playerId);
-        return {
-          id: playerId,
-          score,
-          isCurrentPlayer: playerId === userId,
-          username: player?.username || 'Player ' + playerId.substring(0, 4)
-        };
-      })
-      .sort((a, b) => b.score.points - a.score.points);
-  }
-
   if (!gameStarted) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -327,299 +285,36 @@ const Game: React.FC = () => {
     );
   }
   
-  if (results && userId) {
-    const isWinner = results.winner === userId;
-    const rankedPlayers = getPlayersByRank(results);
-    const playerRank = rankedPlayers.findIndex(p => p.id === userId) + 1;
-    
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
-        <div className="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
-          <h1 className={`text-5xl font-bold mb-6 text-center ${isWinner ? 'text-green-600' : 'text-red-600'}`}>
-            {isWinner ? '🏆 You Won! 🏆' : playerRank === 2 ? '🥈 So Close! 🥈' : '😔 You Placed #' + playerRank + ' 😔'}
-          </h1>
-          
-          <div className="mb-6">
-            <h2 className="text-xl font-bold mb-3 text-center">Final Scores</h2>
-            <div className="space-y-2">
-              {rankedPlayers.map((player, index) => (
-                <div 
-                  key={player.id} 
-                  className={`flex justify-between p-3 rounded-lg ${
-                    player.isCurrentPlayer 
-                      ? 'bg-blue-100 border-2 border-blue-300' 
-                      : 'bg-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <span className="text-xl font-bold mr-2">#{index + 1}</span>
-                    <span className="font-medium">
-                      {player.isCurrentPlayer ? 'You' : player.username}
-                    </span>
-                  </div>
-                  <div className="text-xl font-bold">
-                    {player.score.points}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className="flex space-x-4 mt-8">
-            <button 
-              className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200"
-              onClick={handlePlayAgain}
-              disabled={true}
-            >
-              Play Again (Coming Soon)
-            </button>
-            <button 
-              className="w-1/2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200"
-              onClick={handleHome}
-            >
-              Home
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  if(results && userId){
+    return <GameResultsPanel results={results} players={players} userId={userId} onPlayAgain={handlePlayAgain} onHome={handleHome} />
   }
   
   const currentPlayer = players.find(player => player.id === userId);
   const opponents = players.filter(player => player.id !== userId);
   const totalPlayers = players.length;
   const useSidebar = totalPlayers > 4;
-  
-  const renderPlayerPanel = (player: PlayerData, isCurrentPlayer: boolean = false) => {
-    const bgColor = isCurrentPlayer ? 'bg-blue-50' : 'bg-red-50';
-    const borderColor = isCurrentPlayer ? 'border-blue-300' : 'border-red-300';
-    const textColor = isCurrentPlayer ? 'text-blue-600' : 'text-red-600';
-    const labelBgColor = isCurrentPlayer ? 'bg-blue-600' : 'bg-red-600';
-    
-    return (
-      <div className={`p-3 flex flex-col items-center ${bgColor} relative h-full`}>
-        <div className={`absolute top-1 ${isCurrentPlayer ? 'left-2' : 'right-2'} ${labelBgColor} text-white px-3 py-1 rounded-full text-xs font-semibold`}>
-          {isCurrentPlayer ? 'YOU' : player.username}
-        </div>
-        
-        <div className={`text-3xl font-bold mt-6 mb-2 transition-all duration-300 ${
-          animation[player.id]?.points ? 'scale-150 text-green-600' : textColor
-        }`}>
-          {player.points || 0}
-          {animation[player.id]?.points && <span className="animate-ping absolute text-green-500">+1</span>}
-        </div>
-        
-        {/* player error message */}
-        {playerErrors[player.id] && (
-          <div className="w-full mb-2 px-2 py-1 bg-red-100 border-l-4 border-red-500 text-red-700 text-sm">
-            {playerErrors[player.id]}
-          </div>
-        )}
-        
-        <div className={`w-full ${animation[player.id]?.invalid ? 'animate-shake' : ''}`}>
-          <DynamicTextarea
-            onChange={isCurrentPlayer ? handleWrite : () => {}}
-            onEnter={isCurrentPlayer ? handleMove : undefined}
-            placeholder={isCurrentPlayer ? "Type here..." : "Opponent's text"}
-            disabled={!isCurrentPlayer}
-            value={isCurrentPlayer ? undefined : player.written || ''}
-            className={`border-2 ${
-              animation[player.id]?.valid 
-                ? 'border-green-500' 
-                : animation[player.id]?.invalid 
-                  ? 'border-red-500' 
-                  : borderColor
-            }`}
-          />
-        </div>
-        
-        <div className={`text-2xl font-bold mt-2 mb-2 ${textColor}`}>
-          {player.letters || ''}
-        </div>
-        
-        <div className="w-full p-2 my-2 max-h-28 overflow-y-auto border-2 border-opacity-70 rounded-lg bg-white text-sm" style={{ borderColor: borderColor.replace('border-', '') }}>
-          <h3 className={`font-bold ${textColor} mb-1`}>{isCurrentPlayer ? 'Your' : 'Their'} Words:</h3>
-          <div className="grid grid-cols-2 gap-1">
-            {player.words.map((word, index) => (
-              <span key={index} className={`text-sm font-medium ${isCurrentPlayer ? 'bg-blue-100' : 'bg-red-100'} rounded px-1 py-0.5 truncate`}>
-                {word}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  const renderLeaderboard = () => {
-    return (
-      <div className="w-1/4 bg-gray-100 border-l border-gray-300 p-4 overflow-y-auto md:w-1/4 sm:w-1/3 max-sm:w-2/5 max-sm:p-2">
-        <h2 className="text-xl font-bold mb-4 text-gray-800 text-center max-sm:text-lg max-sm:mb-2">Leaderboard</h2>
-        
-        <div className="space-y-2 max-sm:space-y-1">
-          {players.map((player, index) => (
-            <div 
-              key={player.id}
-              className={`p-2 rounded-lg flex justify-between items-center transition-all duration-300 ${
-                player.id === userId 
-                  ? 'bg-blue-100 border border-blue-300' 
-                  : 'bg-white border border-gray-200'
-              } ${
-                rankChanges[player.id] === 'up' 
-                  ? 'transform -translate-y-2' 
-                  : rankChanges[player.id] === 'down' 
-                    ? 'transform translate-y-2' 
-                    : ''
-              } max-sm:p-1`}
-            >
-              <div className="flex items-center w-3/4 max-sm:w-4/5">
-                <span className="text-lg font-bold mr-2 max-sm:text-sm max-sm:mr-1 min-w-5">#{index + 1}</span>
-                <span className="font-medium text-sm truncate max-sm:text-xs">
-                  {player.id === userId ? 'You' : player.username}
-                </span>
-              </div>
-              
-              <div className={`flex items-center justify-end w-1/4 max-sm:w-1/5 ${
-                animation[player.id]?.points ? 'text-green-600' : ''
-              }`}>
-                {rankChanges[player.id] === 'up' && (
-                  <span className="text-green-500 mr-1">▲</span>
-                )}
-                {rankChanges[player.id] === 'down' && (
-                  <span className="text-red-500 mr-1">▼</span>
-                )}
-                <span className="font-bold max-sm:text-sm text-right">
-                  {player.points}
-                  {animation[player.id]?.points && (
-                    <span className="text-green-500 animate-ping absolute">+1</span>
-                  )}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  if (gamePaused && !showAloneDialog) {
-    return (
-      <div className="relative w-full h-screen">
-        {/* Blurred game UI in background */}
-        <div className="absolute inset-0 filter blur-sm opacity-50">
-          {/* Copy of your existing game UI code here */}
-          <div className="flex w-full h-screen bg-gray-50 relative">
-            <div className="fixed top-0 left-1/2 transform -translate-x-1/2 z-10">
-              <div className="text-4xl font-bold text-red-600 bg-white rounded-b-lg shadow-md px-6 py-2 border-b-2 border-l-2 border-r-2 border-gray-300">
-                {formattedTime}
-              </div>
-            </div>
-            
-            <div className={`flex flex-wrap pt-16 ${useSidebar ? 'w-3/4' : 'w-full'}`}>
-              {currentPlayer && (
-                <div className={`${
-                  totalPlayers <= 2
-                    ? 'w-1/2'
-                    : totalPlayers <= 4
-                      ? 'w-1/2'
-                      : 'w-full'
-                } border-b border-r border-gray-300`}>
-                  {renderPlayerPanel(currentPlayer, true)}
-                </div>
-              )}
-              
-              {opponents
-                .slice(0, useSidebar ? 3 : opponents.length)
-                .map((opponent, index) => (
-                  <div 
-                    key={opponent.id} 
-                    className={`${
-                      totalPlayers <= 2
-                        ? 'w-1/2'
-                        : totalPlayers <= 4
-                          ? 'w-1/2'
-                          : 'w-full'
-                    } border-b ${index < opponents.length - 1 ? 'border-r' : ''} border-gray-300`}
-                  >
-                    {renderPlayerPanel(opponent)}
-                  </div>
-                ))}
-            </div>
-            
-            {useSidebar && renderLeaderboard()}
-          </div>
-        </div>
-        
-        {/* Overlay with loading animation */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-40 z-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600 mx-auto mb-4"></div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Game Paused</h2>
-            <p className="text-gray-600 mb-4">Waiting for player to reconnect...</p>
-            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-4">
-              <div className="bg-indigo-600 h-2.5 rounded-full animate-pulse" style={{width: '100%'}}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex w-full h-screen bg-gray-50 relative">
-      <Dialog open={showAloneDialog} onOpenChange={setShowAloneDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>All other players left the game</DialogTitle>
-            <DialogDescription>
-              You can either continue playing alone or leave the game
-            </DialogDescription>
-          </DialogHeader>
-          <Button onClick={handleContinuePlaying}>Continue Playing</Button>
-          <Button variant="destructive" onClick={handleLeaveGame}>Leave Game</Button>
-        </DialogContent>
-      </Dialog>
-      <div className="fixed top-0 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="text-4xl font-bold text-red-600 bg-white rounded-b-lg shadow-md px-6 py-2 border-b-2 border-l-2 border-r-2 border-gray-300">
-          {formattedTime}
-        </div>
-      </div>
-      
-      <div className={`flex flex-wrap pt-16 ${useSidebar ? 'w-3/4 max-sm:w-3/5' : 'w-full'}`}>
-        {/* Current player always shown */}
-        {currentPlayer && (
-          <div className={`${
-            totalPlayers <= 2
-              ? 'w-1/2'
-              : totalPlayers <= 4
-                ? 'w-1/2'
-                : 'w-full'
-          } border-b border-r border-gray-300`}>
-            {renderPlayerPanel(currentPlayer, true)}
-          </div>
-        )}
-        
-        {/* Opponents - show all for 2-4 players, or just top 1-3 for 5+ */}
-        {opponents
-          .slice(0, useSidebar ? 3 : opponents.length)
-          .map((opponent, index) => (
-            <div 
-              key={opponent.id} 
-              className={`${
-                totalPlayers <= 2
-                  ? 'w-1/2'
-                  : totalPlayers <= 4
-                    ? 'w-1/2'
-                    : 'w-full'
-              } border-b ${index < opponents.length - 1 ? 'border-r' : ''} border-gray-300`}
-            >
-              {renderPlayerPanel(opponent)}
-            </div>
-          ))}
-      </div>
-      
-      {/* Sidebar for 5+ players */}
-      {useSidebar && renderLeaderboard()}
+      <GameHeader time={time} />
+      <GameDialogs 
+        showAloneDialog={showAloneDialog} 
+        gamePaused={gamePaused && !showAloneDialog}
+        onContinuePlaying={handleContinuePlaying}
+        onLeaveGame={handleLeaveGame}
+        setShowAloneDialog={setShowAloneDialog}
+      />
+      <GameContent 
+        currentPlayer={currentPlayer || {id: '', username: '', points: 0, letters: '', written: '', words: [], isPlaying: false}}
+        opponents={opponents}
+        useSidebar={useSidebar}
+        totalPlayers={totalPlayers}
+        handleWrite={handleWrite}
+        handleMove={handleMove}
+        animation={animation}
+        playerErrors={playerErrors}
+        rankChanges={rankChanges}
+      />
       
       <style>{`
         @keyframes shake {
