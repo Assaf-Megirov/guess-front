@@ -42,9 +42,8 @@ const GameResultsPanel = ({ results, players, userId, onPlayAgain, onHome }: Gam
             <button 
               className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200"
               onClick={onPlayAgain}
-              disabled={true}
             >
-              Play Again (Coming Soon)
+              Play Again
             </button>
             <button 
               className="w-1/2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200"

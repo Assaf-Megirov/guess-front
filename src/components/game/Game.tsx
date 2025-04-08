@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { GamePausedData, GameResumedData, InvalidMoveResponse, MoveResponse, PlayerLeftData, useGame, ValidMoveResponse } from '@/contexts/GameContext';
-import { GameStatus } from '@/types/GameStatus';
 import { GameState } from '@/types/GameState';
 import { PlayerData } from '@/types/PlayerData';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +25,7 @@ const Game: React.FC = () => {
   const [gamePaused, setGamePaused] = useState(false);
   const [showAloneDialog, setShowAloneDialog] = useState(false);
 
-  const { move, write, on, gameData, gameStarted, connectToGame, cleanContext, setGameData } = useGame();
+  const { move, write, on, gameData, gameStarted, connectToGame, cleanContext } = useGame();
   const { user, guestId, isAuthenticated } = useAuth();
   const userId = isAuthenticated ? user?.id : guestId;
   const navigate = useNavigate();
@@ -250,6 +249,7 @@ const Game: React.FC = () => {
   }, [on, handleGameStateChange, handleOpponentMoveInvalid, handleOpponentMoveValid, handleGameStarted, handleGameEnded, handlePlayerRemoved, handleGamePaused, handleGameResumed]);
 
   const handleHome = () => {
+    localStorage.setItem('lobbyCode', ''); //to disable auto-rejoin
     if(isAuthenticated){
       navigate('/home');
     } else {
@@ -258,20 +258,26 @@ const Game: React.FC = () => {
     cleanContext();
   }
 
+  //this implementation is for immediate restart
+  // const handlePlayAgain = () => { 
+  //   const gameIdTemp = gameData?.gameId;
+  //   cleanContext();
+  //   setResults(null);
+  //   setPlayers([]);
+  //   setTime(0);
+  //   if(gameIdTemp){
+  //     setGameData({gameId: gameIdTemp, opponents: [], status: GameStatus.NotStarted, elapsedTime: 0});
+  //   }else{
+  //     console.error('No gameId found');
+  //     toast.error('We had trouble restarting the game');
+  //     navigate('/');
+  //   }
+  //   connectToGame();
+  // }
+
   const handlePlayAgain = () => {
-    const gameIdTemp = gameData?.gameId;
-    cleanContext();
-    setResults(null);
-    setPlayers([]);
-    setTime(0);
-    if(gameIdTemp){
-      setGameData({gameId: gameIdTemp, opponents: [], status: GameStatus.NotStarted, elapsedTime: 0});
-    }else{
-      console.error('No gameId found');
-      toast.error('We had trouble restarting the game');
-      navigate('/');
-    }
-    connectToGame();
+    console.log('Play again button clicked');
+    navigate('/');
   }
 
   if (!gameStarted) {
