@@ -7,9 +7,30 @@ const Header: React.FC = () => {
         {/* About Section */}
         <div className="flex flex-col items-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 text-center">About</h2>
-          <p className="text-sm md:text-base text-center">
-            This is just a fun project, dont take it too seriously. you can contact me at awindyendprod@gmail.com
-          </p>
+          <div className="text-sm md:text-base text-center">
+            <p>This is just a fun project, don't take it too seriously.</p>
+            <p>
+              You can find the source code here:{" "}
+              <a
+                className="text-blue-500 underline"
+                href="https://github.com/Assaf-Megirov/guess-front"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                front
+              </a>{" "}
+              and{" "}
+              <a
+                className="text-blue-500 underline"
+                href="https://github.com/Assaf-Megirov/guess-back"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                back
+              </a>.
+            </p>
+            <p>You can contact me at awindyendprod@gmail.com.</p>
+          </div>
         </div>
         {/* How To Section */}
         <div className="flex flex-col items-center">
