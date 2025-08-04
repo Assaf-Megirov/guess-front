@@ -161,12 +161,22 @@ const Home: React.FC = () => {
           </button>
         </div>
         <p className="text-gray-600 text-base">
-          This is your personalized home page. More content coming soon!
+          More content coming soon!
         </p>
       </div>
       {user.isOnline = true}
-      <UserList users={friends || []} areFriends={true} />
-      <UserList users={suggestions || []} areFriends={false} />
+      {friends && friends.length > 0 && (
+        <div>
+          <p className="text-gray-600 text-base mb-2">Friends</p>
+          <UserList users={friends || []} areFriends={true} />
+        </div>
+      )}
+      {suggestions && suggestions.length > 0 && (
+        <div>
+          <p className="text-gray-600 text-base mb-2">Friend Suggestions</p>
+          <UserList users={suggestions || []} areFriends={false} />
+        </div>
+      )}
     </div>
   );
 };

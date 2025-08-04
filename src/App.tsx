@@ -14,7 +14,7 @@ import Game from './components/game/Game';
 import GameInvites from './components/game/GameInvites';
 import Index from './components/Index';
 import SingleGame from './components/game/SingleGame';
-
+import Privacy from './components/Privacy';
 function App() {
   return (
     <Router>
@@ -65,6 +65,9 @@ function App() {
                   }/>
                   <Route path='/singleGame' element={
                       <SingleGame />
+                  }/>
+                  <Route path='/privacy' element={
+                      <Privacy />
                   }/>
                 </Routes>
               </div>
