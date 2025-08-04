@@ -6,6 +6,7 @@ import { useGame } from '../contexts/GameContext';
 import { GameStatus } from '@/types/GameStatus';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { GameSettings } from './game/GameSettingsMenu';
 import Header from './Header';
 const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
 const LOBBY_NAMESPACE = import.meta.env.VITE_API_LOBBY_NAMESPACE;
@@ -29,6 +30,7 @@ const Index: React.FC<IndexProps> = () => {
     const socketRef = React.useRef<Socket | null>(null);
     const [socketConnected, setSocketConnected] = useState<boolean>(false);
     const [lobby, setLobby] = useState<Lobby | null>(null);
+    const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
     const lobbyRef = React.useRef<Lobby | null>(null);
     const [gameCode, setGameCode] = useState<string>('');
     const [username, setUsername] = useState<string>('');
@@ -57,11 +59,12 @@ const Index: React.FC<IndexProps> = () => {
             console.log('socket connected');
             setSocketConnected(true);
         });
-        socket.on('lobby_state', (lobby: {code: string, players: {playerId: string, username: string, ready: boolean}[], admin: {playerId: string, username: string}}) => {
+        socket.on('lobby_state', (lobby: {code: string, players: {playerId: string, username: string, ready: boolean}[], admin: {playerId: string, username: string}, gameSettings: GameSettings}) => {
             console.log(`lobby state: ${JSON.stringify(lobby)}`);
             const newLobby = {code: lobby.code, players: lobby.players.map(player => ({id: player.playerId, username: player.username, ready: player.ready})), admin: {id: lobby.admin.playerId, username: lobby.admin.username}};
             setLobby(newLobby);
             lobbyRef.current = newLobby;
+            setGameSettings(lobby.gameSettings);
         });
         socket.on('start_game', (data: {gameId: string}) => {
             const {gameId} = data;
@@ -235,11 +238,35 @@ const Index: React.FC<IndexProps> = () => {
         setLobby(null);
         localStorage.removeItem('lobbyCode');
     }
+
+    const onGameSettingsChange = (newSettings: GameSettings) => {
+        console.log('game settings changed:', newSettings);
+        const socket = socketRef.current;
+        if(!socket){
+            console.error('Socket not initialized');
+            return;
+        }
+        socket.emit('set_game_settings', {
+            code: lobby?.code,
+            playerId: isGuest ? guestId : user?.id,
+            gameSettings: newSettings
+        });
+        setGameSettings(newSettings);
+    }
     
     if(lobby){
         const userId = isGuest ? guestId : user?.id;
         if (!userId) return null;
-        return <Lobby lobby={lobby} userId={userId} onReady={onReady} onUnready={onUnready} onStart={onStart} onLeave={onLeave} />
+        return <Lobby 
+            lobby={lobby} 
+            userId={userId} 
+            onReady={onReady} 
+            onUnready={onUnready} 
+            onStart={onStart} 
+            onLeave={onLeave}
+            gameSettings={gameSettings}
+            onGameSettingsChange={onGameSettingsChange}
+        />
     }
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
