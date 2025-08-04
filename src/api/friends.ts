@@ -41,6 +41,21 @@ export const getOutgoingFriendRequests = async (token: string) => {
     }
 };
 
+export const findUser = async (username: string, token: string) => {
+    try {
+        console.log('finding user:', username);
+        const response = await fetch(`${FRIENDS_API}/find?username=${username}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Error finding user');
+        const data = await response.json();
+        return { success: true, users: data };
+    } catch (error) {
+        console.error('Error finding user:', error);
+        throw error;
+    }
+}
+
 interface ApiResponse {
     success: boolean;
     message: string;

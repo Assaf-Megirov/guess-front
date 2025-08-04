@@ -62,6 +62,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               </li>
               <li>
                 <Link
+                  to="/addFriend"
+                  className="block px-4 py-2 rounded hover:bg-gray-700"
+                >
+                  Add Friend
+                </Link>
+              </li>
+              <li>
+                <Link
                   to="/incoming"
                   className="block px-4 py-2 rounded hover:bg-gray-700"
                 >

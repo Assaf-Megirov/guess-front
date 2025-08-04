@@ -15,6 +15,7 @@ import GameInvites from './components/game/GameInvites';
 import Index from './components/Index';
 import SingleGame from './components/game/SingleGame';
 import Privacy from './components/Privacy';
+import AddFriend from './components/social/AddFriend';
 function App() {
   return (
     <Router>
@@ -40,6 +41,11 @@ function App() {
                   <Route path='/home' element={
                     <PrivateRoute>
                       <Home />
+                    </PrivateRoute>
+                  }/>
+                  <Route path='/addFriend' element={
+                    <PrivateRoute>
+                      <AddFriend />
                     </PrivateRoute>
                   }/>
                   <Route path='/incoming' element={
