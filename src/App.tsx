@@ -16,6 +16,9 @@ import Index from './components/Index';
 import SingleGame from './components/game/SingleGame';
 import Privacy from './components/Privacy';
 import AddFriend from './components/social/AddFriend';
+import { ChatProvider } from './contexts/ChatContext';
+import ChatWindow from './components/social/ChatWindow';
+
 function App() {
   return (
     <Router>
@@ -23,61 +26,64 @@ function App() {
         <Toaster/>
         <SocialProvider>
           <GameProvider>
-            <AuthRedirect />
-            <GameRedirect />
-            <div className="flex justify-center w-full">
-              <Sidebar className="z-20"/>
+            <ChatProvider>
+              <AuthRedirect />
+              <GameRedirect />
+              <div className="flex justify-center w-full">
+                <Sidebar className="z-20"/>
 
-              <div className="w-full bg-gray-100 p-4 sm:p-6 rounded-lg 
-                  sm:ml-4 
-                  sm:w-4/5 
-                  md:w-3/4 
-                  lg:w-2/3 
-                  xl:w-1/2 
-                  z-10
-                  transition-all duration-300">
-                <Routes>
-                  <Route path='/auth' element={<AuthPage/>} />
-                  <Route path='/home' element={
-                    <PrivateRoute>
-                      <Home />
-                    </PrivateRoute>
-                  }/>
-                  <Route path='/addFriend' element={
-                    <PrivateRoute>
-                      <AddFriend />
-                    </PrivateRoute>
-                  }/>
-                  <Route path='/incoming' element={
-                    <PrivateRoute>
-                      <Incoming />
-                    </PrivateRoute>
-                  }/>
-                  <Route path='/outgoing' element={
-                    <PrivateRoute>
-                      <Outgoing />
-                    </PrivateRoute>
-                  }/>
-                  <Route path='/game' element={
-                      <Game />
-                  }/>
-                  <Route path='/gameInvites' element={
-                    <PrivateRoute>
-                      <GameInvites />
-                    </PrivateRoute>
-                  }/>
-                  <Route path='/' element={
-                      <Index />
-                  }/>
-                  <Route path='/singleGame' element={
-                      <SingleGame />
-                  }/>
-                  <Route path='/privacy' element={
-                      <Privacy />
-                  }/>
-                </Routes>
+                <div className="w-full bg-gray-100 p-4 sm:p-6 rounded-lg 
+                    sm:ml-4 
+                    sm:w-4/5 
+                    md:w-3/4 
+                    lg:w-2/3 
+                    xl:w-1/2 
+                    z-10
+                    transition-all duration-300">
+                  <Routes>
+                    <Route path='/auth' element={<AuthPage/>} />
+                    <Route path='/home' element={
+                      <PrivateRoute>
+                        <Home />
+                      </PrivateRoute>
+                    }/>
+                    <Route path='/addFriend' element={
+                      <PrivateRoute>
+                        <AddFriend />
+                      </PrivateRoute>
+                    }/>
+                    <Route path='/incoming' element={
+                      <PrivateRoute>
+                        <Incoming />
+                      </PrivateRoute>
+                    }/>
+                    <Route path='/outgoing' element={
+                      <PrivateRoute>
+                        <Outgoing />
+                      </PrivateRoute>
+                    }/>
+                    <Route path='/game' element={
+                        <Game />
+                    }/>
+                    <Route path='/gameInvites' element={
+                      <PrivateRoute>
+                        <GameInvites />
+                      </PrivateRoute>
+                    }/>
+                    <Route path='/' element={
+                        <Index />
+                    }/>
+                    <Route path='/singleGame' element={
+                        <SingleGame />
+                    }/>
+                    <Route path='/privacy' element={
+                        <Privacy />
+                    }/>
+                  </Routes>
+                </div>
               </div>
-            </div>
+              <ChatWindow />
+            </ChatProvider>
           </GameProvider>
         </SocialProvider>
       </AuthProvider>

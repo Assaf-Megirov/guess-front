@@ -12,6 +12,7 @@ import { sendFriendRequest, removeFriend } from '@/api/friends';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useSocial } from '@/contexts/SocialContext';
+import { useChat } from '@/contexts/ChatContext';
  
 interface UserCardProps {
   user: User;
@@ -25,6 +26,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, isFriend, hasOutgoingRequest 
 
   const {token} = useAuth();
   const {triggerFriendsListUpdate, sendInvite} = useSocial();
+  const {chatWith, setIsOpen} = useChat();
 
   const handleAddToFriends = async () => {
     try {
@@ -77,6 +79,12 @@ const UserCard: React.FC<UserCardProps> = ({ user, isFriend, hasOutgoingRequest 
     sendInvite(user.id);
   }
 
+  const handleChat = () => {
+    console.log('Chat with', user.username);
+    chatWith(user);
+    setIsOpen(true);
+  }
+
   return (
     <div className="flex items-center border border-gray-300 rounded-lg p-4 max-w-md shadow-md bg-white">
       {imageUrl ? (
@@ -100,7 +108,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, isFriend, hasOutgoingRequest 
             <DropdownMenuContent className="w-56">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => alert('Chat feature not implemented yet.')}>
+              <DropdownMenuItem onClick={handleChat}>
                 Chat
               </DropdownMenuItem>
               <DropdownMenuItem

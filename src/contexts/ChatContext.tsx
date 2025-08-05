@@ -1,0 +1,303 @@
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { getChats, getChatMessages } from '@/api/chats';
+import { useAuth } from '@/contexts/AuthContext';
+import { User } from '@/types/User';
+import { io, Socket } from 'socket.io-client';
+const BASE_SOCKET_URL = import.meta.env.VITE_API_BASE_SOCKET_URL;
+const CHAT_NAMESPACE = import.meta.env.VITE_API_CHAT_NAMESPACE;
+const SOCKET_URL = `${BASE_SOCKET_URL}/${CHAT_NAMESPACE}`;
+
+export interface Message {
+    _id: string;
+    chatId: string;
+    sender: {
+        _id: string;
+        username: string;
+        avatar: string;
+    };
+    content: string;
+    messageType: string;
+    fileUrl?: string;
+    fileName?: string;
+    readBy: {
+        user: {
+            _id: string;
+            username: string;
+        };
+        readAt: Date;
+    }[];
+    edited: boolean;
+    editedAt?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface Chat {
+    _id: string;
+    participants: {
+        _id: string;
+        username: string;
+        email: string;
+        avatar: string;
+    }[];
+    lastMessage?: {
+        content: string;
+        sender: {
+            _id: string;
+            username: string;
+            email: string;
+            avatar: string;
+        };
+        timestamp: Date;
+    };
+    messageCount: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+interface ChatContextType {
+    chats: Chat[];
+    setChats: (chats: Chat[]) => void;
+    chat: Chat | null; //the current chat
+    selectChat: (chatId: string) => void;
+    chatWith: (friend: User) => void;
+    messages: Message[]; //the messages in the current chat
+    setMessages: (messages: Message[]) => void;
+    isLoading: boolean;
+    setIsLoading: (isLoading: boolean) => void;
+    error: any;
+    setError: (error: any) => void;
+    isOpen: boolean;
+    setIsOpen: (isOpen: boolean) => void;
+    sendMessage: (message: string) => Promise<void>;
+}
+
+const ChatContext = createContext<ChatContextType | undefined>(undefined);
+
+export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
+    const [chats, setChats] = useState<Chat[]>([]);
+    const [chat, setChat] = useState<Chat | null>(null);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<any>(null);
+    const [isOpen, setIsOpen] = useState(true);
+    const { token } = useAuth();
+
+    const socketRef = useRef<Socket | null>(null);
+    const chatRef = useRef<Chat | null>(null);
+    const userId = useAuth().user?.id;
+
+    useEffect(() => {
+        const fetchChats = async () => {
+            console.log('fetching chats');
+            if(!token) return;
+            try {
+                setIsLoading(true);
+                setError(null);
+                const chats = await getChats(token);
+                setChats(chats);
+            } catch (err) {
+                setError(err);
+                console.error('Error fetching chats:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        fetchChats();
+    }, [token]);
+
+    useEffect(() => {
+        //whenever the current chat changes, we need to fetch the messages
+        if(!chat) return;
+        
+        let isMounted = true;
+        const currentChatId = chat._id;
+        
+        const fetchMessages = async () => {
+            if(!token) return;
+            if(!chat) return;
+            
+            try {
+                setIsLoading(true);
+                setError(null);
+                console.log('Fetching messages for chat:', currentChatId);
+                const incomingMessages = await getChatMessages(token, currentChatId);
+                if (isMounted && chatRef.current?._id === currentChatId) {
+                    console.log('Setting messages for chat:', currentChatId, 'count:', incomingMessages.length);
+                    setMessages(incomingMessages);
+                } else {
+                    console.log('Chat changed during fetch, discarding messages for:', currentChatId);
+                }
+            } catch (err) {
+                if (isMounted && chatRef.current?._id === currentChatId) {
+                    setError(err);
+                    console.error('Error fetching messages:', err);
+                }
+            } finally {
+                if (isMounted && chatRef.current?._id === currentChatId) {
+                    setIsLoading(false);
+                }
+            }
+        }
+        
+        fetchMessages();
+        
+        return () => {
+            isMounted = false;
+        };
+    }, [chat, token]);
+
+    useEffect(() => {
+        if(!token) return;
+        
+        const socket = io(SOCKET_URL, {
+            auth: { token }
+        });
+    
+        socket.on('message_received', (message: Message) => {
+            debugMessageFlow('message_received', message);
+            setMessages(prevMessages => {
+                console.log('message.chatId', message.chatId);
+                const currentChat = chatRef.current;
+                console.log('currentChat?._id', currentChat?._id);
+                if(message.chatId === currentChat?._id) {
+                    if(!prevMessages.some(m => m._id === message._id)) {
+                        console.log('Adding message to current chat:', message.content.substring(0, 50));
+                        return [...prevMessages, message];
+                    } else {
+                        console.log('Message already exists, skipping:', message._id);
+                    }
+                } else {
+                    console.log('Message not for current chat, ignoring:', message.chatId, 'vs', currentChat?._id);
+                }
+                return prevMessages;
+            });
+        });
+    
+        socket.on('message_sent', (message: Message) => {
+            debugMessageFlow('message_sent', message);
+            setMessages(prevMessages => {
+                const currentChat = chatRef.current;
+                if(message.chatId === currentChat?._id) {
+                    if(!prevMessages.some(m => m._id === message._id)) {
+                        console.log('Adding sent message to current chat:', message.content.substring(0, 50));
+                        return [...prevMessages, message];
+                    } else {
+                        console.log('Sent message already exists, skipping:', message._id);
+                    }
+                } else {
+                    console.log('Sent message not for current chat, ignoring:', message.chatId, 'vs', currentChat?._id);
+                }
+                return prevMessages;
+            });
+        });
+    
+        socketRef.current = socket;
+    
+        return () => {
+            socket.disconnect();
+        }
+    }, [token]);
+
+    useEffect(() => {
+        return () => {
+            if (socketRef.current) {
+                console.log('Cleaning up socket connection');
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, []);
+
+    const sendMessage = async (message: string) => {
+        if(!token) return;
+        if(!chat) return;
+        
+        try {
+            setError(null);
+            socketRef.current?.emit('send_message', { 
+                friendId: chat.participants.find(participant => participant._id !== userId)?._id, 
+                message 
+            });
+        } catch (err) {
+            setError(err);
+            console.error('Error sending message:', err);
+        }
+    }
+
+    const selectChat = (chatId: string) => {
+        const chat = chats.find(chat => chat._id === chatId);
+        if(!chat) return;
+        
+        debugMessageFlow('selectChat', { chatId, participants: chat.participants.map(p => p.username) });
+        setChat(chat);
+        setMessages([]);
+        setIsOpen(true);
+    }
+
+    const chatWith = (friend: User) => {
+        const existingChat = chats.find(chat => chat.participants.some(participant => participant._id === friend.id));
+        console.log('chat', existingChat);
+        
+        //check if this is the same chat as currently selected
+        const isSameChat = existingChat && chat && existingChat._id === chat._id;
+        
+        if (!existingChat) {
+            const newChat = { //create a temp chat for new conversation
+                _id: 'temp',
+                participants: [{_id: friend.id, username: friend.username, email: friend.email, avatar: 'none'}],
+                messageCount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
+            debugMessageFlow('chatWith_temp', { friend: friend.username });
+            setChat(newChat);
+            setMessages([]);
+        } else if (isSameChat) {
+            debugMessageFlow('chatWith_same', { chatId: existingChat._id, friend: friend.username });
+            setIsOpen(true);
+            //don't call setChat or setMessages - keep existing state
+            return;
+        } else {
+            debugMessageFlow('chatWith_existing', { chatId: existingChat._id, friend: friend.username });
+            setChat(existingChat);
+            setMessages([]);
+        }
+        
+        setIsOpen(true);
+    }
+
+    // Update chatRef whenever chat changes
+    useEffect(() => {
+        chatRef.current = chat;
+        console.log('chat changed', chat);
+    }, [chat]);
+
+    // Debug function to track message flow
+    const debugMessageFlow = (action: string, message?: any) => {
+        const currentChat = chatRef.current;
+        console.log(`[DEBUG] ${action}:`, {
+            currentChatId: currentChat?._id,
+            currentChatParticipants: currentChat?.participants.map(p => p.username),
+            messageCount: messages.length,
+            message: message ? {
+                id: message._id,
+                chatId: message.chatId,
+                content: message.content?.substring(0, 30),
+                sender: message.sender?.username
+            } : null
+        });
+    };
+
+    return <ChatContext.Provider value={{ chats, setChats, chat, selectChat, chatWith, messages, setMessages, isLoading, setIsLoading, error, setError, isOpen, setIsOpen, sendMessage }}>{children}</ChatContext.Provider>;
+}
+
+export const useChat = () => {
+    const context = useContext(ChatContext);
+    if(!context){
+        throw new Error('useChat must be used within a ChatProvider');
+    }
+    return context;
+}
+
+export default ChatContext;
