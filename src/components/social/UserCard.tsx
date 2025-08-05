@@ -16,10 +16,12 @@ import { useSocial } from '@/contexts/SocialContext';
 interface UserCardProps {
   user: User;
   isFriend: boolean;
+  hasOutgoingRequest?: boolean;
   imageUrl?: string;
+  onRequestSent?: () => void;
 }
 
-const UserCard: React.FC<UserCardProps> = ({ user, isFriend, imageUrl }) => {
+const UserCard: React.FC<UserCardProps> = ({ user, isFriend, hasOutgoingRequest = false, imageUrl, onRequestSent }) => {
 
   const {token} = useAuth();
   const {triggerFriendsListUpdate, sendInvite} = useSocial();
@@ -38,8 +40,9 @@ const UserCard: React.FC<UserCardProps> = ({ user, isFriend, imageUrl }) => {
           duration: 5000,
         });
       }else{
-        toast(`Friend Requset sent!`, {dismissible: true});
+        toast(`Friend Request sent!`, {dismissible: true});
         triggerFriendsListUpdate();
+        onRequestSent?.(); //refresh the outgoing requests list
       }
     } catch (error) {
       console.error('Error sending friend request:', error);
@@ -112,13 +115,28 @@ const UserCard: React.FC<UserCardProps> = ({ user, isFriend, imageUrl }) => {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <button
-            onClick={handleAddToFriends}
-            
-            className="px-2 py-1 text-sm text-white rounded bg-green-800 hover:bg-green-600"
-          >
-            Add to Friends
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            {hasOutgoingRequest ? (
+              <>
+                <button
+                  disabled
+                  className="px-2 py-1 text-sm text-gray-500 rounded bg-gray-300 cursor-not-allowed"
+                >
+                  Add to Friends
+                </button>
+                <span className="text-xs text-gray-500 text-right">
+                  Request sent
+                </span>
+              </>
+            ) : (
+              <button
+                onClick={handleAddToFriends}
+                className="px-2 py-1 text-sm text-white rounded bg-green-800 hover:bg-green-600"
+              >
+                Add to Friends
+              </button>
+            )}
+          </div>
         )}
         <div
           className={`w-3 h-3 rounded-full ${user.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}
