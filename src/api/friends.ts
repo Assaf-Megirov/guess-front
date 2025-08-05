@@ -41,15 +41,15 @@ export const getOutgoingFriendRequests = async (token: string) => {
     }
 };
 
-export const findUser = async (username: string, token: string) => {
+export const findUser = async (username: string, token: string, page = 1, limit = 10) => {
     try {
         console.log('finding user:', username);
-        const response = await fetch(`${FRIENDS_API}/find?username=${username}`, {
+        const response = await fetch(`${FRIENDS_API}/find?username=${username}&page=${page}&limit=${limit}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error('Error finding user');
         const data = await response.json();
-        return { success: true, users: data };
+        return { success: true, users: data.users, pagination: data.pagination };
     } catch (error) {
         console.error('Error finding user:', error);
         throw error;

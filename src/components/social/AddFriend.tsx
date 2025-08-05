@@ -11,6 +11,9 @@ export const AddFriend: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [friends, setFriends] = useState<User[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalResults, setTotalResults] = useState(0);
     const { token } = useAuth();
 
     useEffect(() => {
@@ -36,7 +39,7 @@ export const AddFriend: React.FC = () => {
         }
     };
 
-    const handleSearch = async () => {
+    const handleSearch = async (page = 1) => {
         if (!username.trim()) {
             toast("Please enter a username to search", {
                 className: "bg-yellow-500 text-white p-4 rounded shadow-lg",
@@ -55,7 +58,7 @@ export const AddFriend: React.FC = () => {
 
         setIsSearching(true);
         try {
-            const response = await findUser(username, token);
+            const response = await findUser(username, token, page, 10);
             if (response.success) {
                 const mappedUsers = response.users.map((user: any) => ({
                     id: user._id,
@@ -64,6 +67,9 @@ export const AddFriend: React.FC = () => {
                     isOnline: user.isOnline,
                 }));
                 setUsers(mappedUsers);
+                setCurrentPage(page);
+                setTotalPages(response.pagination.pages);
+                setTotalResults(response.pagination.total);
                 
                 if (mappedUsers.length === 0) {
                     toast("No users found with that username", {
@@ -131,7 +137,7 @@ export const AddFriend: React.FC = () => {
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                         <button 
-                            onClick={handleSearch}
+                            onClick={() => handleSearch(1)}
                             disabled={isSearching}
                             className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
@@ -143,7 +149,7 @@ export const AddFriend: React.FC = () => {
                 {users.length > 0 && (
                     <div>
                         <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                            Search Results ({users.length} found)
+                            Search Results ({totalResults} found)
                         </h2>
                         
                         {/* Display non-friends first */}
@@ -163,6 +169,31 @@ export const AddFriend: React.FC = () => {
                                     Already Friends ({friendsInResults.length})
                                 </h3>
                                 <UserList users={friendsInResults} areFriends={true} />
+                            </div>
+                        )}
+                        
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex justify-center items-center gap-2 mt-6">
+                                <button
+                                    onClick={() => handleSearch(currentPage - 1)}
+                                    disabled={currentPage <= 1 || isSearching}
+                                    className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                >
+                                    Previous
+                                </button>
+                                
+                                <span className="px-3 py-1 text-gray-700">
+                                    Page {currentPage} of {totalPages}
+                                </span>
+                                
+                                <button
+                                    onClick={() => handleSearch(currentPage + 1)}
+                                    disabled={currentPage >= totalPages || isSearching}
+                                    className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                >
+                                    Next
+                                </button>
                             </div>
                         )}
                     </div>
