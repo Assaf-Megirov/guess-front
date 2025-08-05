@@ -38,8 +38,8 @@ The game can end in one of 2 ways:
     - Run dev server - ```pnpm run dev```
   
 ## ENV Variables
-- VITE_API_BASE_URL = https://The domain name of the backend
-- VITE_API_BASE_SOCKET_URL = wss://The domain name of the backend
+- VITE_API_BASE_URL = https:// The domain name of the backend
+- VITE_API_BASE_SOCKET_URL = wss:// The domain name of the backend
 - These should be the same as configured in the backend (should not be different unless the backend is changed)
   - VITE_API_GAME_NAMESPACE=game
   - VITE_API_LOBBY_NAMESPACE=lobby
