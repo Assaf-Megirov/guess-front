@@ -45,6 +45,12 @@ The game can end in one of 2 ways:
   - VITE_API_LOBBY_NAMESPACE=lobby
   - VITE_API_CHAT_NAMESPACE=chat
   - VITE_API_GAME_ROUTE=game
+
+## TODO List
+- Add typing indicators
+- Add a sidebar in the chat window that shows all of the chats
+  - Add individual unread messages counts in this sidebar
+- Add general unread messages count on the minimised chat button
  
 ## Structure
 
