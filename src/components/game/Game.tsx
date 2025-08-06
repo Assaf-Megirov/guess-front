@@ -13,6 +13,7 @@ import PlayerError from '@/types/PlayerErrors';
 import AnimationState from '@/types/AnimationState';
 import GameContent from './GameContent';
 
+const DEBOUNCE_TIME = import.meta.env.VITE_DEBOUNCE_TIME || 3;
 
 const Game: React.FC = () => {
   const [time, setTime] = useState(0); //in seconds
@@ -88,7 +89,10 @@ const Game: React.FC = () => {
 
   const handleGameStateChange = (data: GameState) => { //sets rankChanges and players[]
     console.log('Game state changed');
-    setTime(gameData?.elapsedTime || 0);
+    //only change the time if the difference between the frontend game timer and the truth is greater than 1 second
+    if(Math.abs(gameData?.elapsedTime || 0 - time) > DEBOUNCE_TIME) {
+      setTime(gameData?.elapsedTime || 0);
+    }
     
     const playerEntries = Array.from(data.playerData.entries());
     console.log(`Player entries: ${JSON.stringify(playerEntries)}`);

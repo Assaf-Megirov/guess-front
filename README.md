@@ -46,12 +46,14 @@ The game can end in one of 2 ways:
   - VITE_API_CHAT_NAMESPACE=chat
   - VITE_API_GAME_ROUTE=game
 
+- VITE_DEBOUNCE_TIME=3 # game timer debounce in seconds, a value between 1 and 3 is recommended
+
 ## TODO List
 - [x] Add typing indicators
 - [ ] Add a sidebar in the chat window that shows all of the chats
   - [ ] Add individual unread messages counts in this sidebar
 - [ ] Add general unread messages count on the minimised chat button
-- [ ] Add debounce to the timer (if the difference between the forntend game timer and the truth, dont update it to avoid stuttering)
+- [x] Add debounce to the timer (if the difference between the forntend game timer and the truth, dont update it to avoid stuttering)
  
 ## Structure
 
