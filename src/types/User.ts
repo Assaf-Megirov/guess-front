@@ -4,4 +4,5 @@ export interface User {
     username: string;
     isOnline?: boolean;
     lastActive?: Date;
+    avatar?: string;
 }
