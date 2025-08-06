@@ -55,6 +55,31 @@ export interface Chat {
     updatedAt: Date;
 }
 
+export interface PopulatedMessage{
+    _id: string;
+    chatId: Chat;
+    sender: {
+        _id: string;
+        username: string;
+        avatar: string;
+    };
+    content: string;
+    messageType: string;
+    fileUrl?: string;
+    fileName?: string;
+    readBy: {
+        user: {
+            _id: string;
+            username: string;
+        };
+        readAt: Date;
+    }[];
+    edited: boolean;
+    editedAt?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 interface ChatContextType {
     chats: Chat[];
     setChats: (chats: Chat[]) => void;
@@ -91,6 +116,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     const socketRef = useRef<Socket | null>(null);
     const chatRef = useRef<Chat | null>(null);
+    const chatsRef = useRef<Chat[]>([]);
     const userId = useAuth().user?.id;
 
     useEffect(() => {
@@ -102,6 +128,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 setError(null);
                 const chats = await getChats(token);
                 setChats(chats);
+                chatsRef.current = chats;
             } catch (err) {
                 setError(err);
                 console.error('Error fetching chats:', err);
@@ -110,7 +137,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             }
         }
         fetchChats();
-    }, [token]);
+    }, [token, chat]);
 
     useEffect(() => {
         //whenever the current chat changes, we need to fetch the messages
@@ -160,39 +187,81 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             auth: { token }
         });
     
-        socket.on('message_received', (message: Message) => {
+        socket.on('message_received', (message: PopulatedMessage) => {
             debugMessageFlow('message_received', message);
             setMessages(prevMessages => {
                 console.log('message.chatId', message.chatId);
                 const currentChat = chatRef.current;
                 console.log('currentChat?._id', currentChat?._id);
-                if(message.chatId === currentChat?._id) {
+                //if the message is for the current chat or the current chat is a temp chat and the message is for the same participants
+                if(message.chatId._id === currentChat?._id || (currentChat?._id === 'temp' && message.chatId.participants.every(participant => currentChat?.participants.some(p => p._id === participant._id)))) {
                     if(!prevMessages.some(m => m._id === message._id)) {
                         console.log('Adding message to current chat:', message.content.substring(0, 50));
-                        return [...prevMessages, message];
+                        if(currentChat?._id === 'temp') { //if we dont have the chat yet, set it before returning
+                            console.log('setting chat to', message.chatId);
+                            setChat(message.chatId);
+                        }
+                        return [...prevMessages, populatedMessageToMessage(message)];
                     } else {
                         console.log('Message already exists, skipping:', message._id);
                     }
+                    if(currentChat?._id === 'temp') { //TODO: remove?
+                        setChat(message.chatId);
+                        //chats should be fetched in the useEffect that depends on chat because chat is changed here
+                    }
                 } else {
                     console.log('Message not for current chat, ignoring:', message.chatId, 'vs', currentChat?._id);
+                    //refetch chats, in case the chat is not open yet thus the chat will be undefined and not temp
+                    const fetchChats = async () => {
+                        if(!token) return;
+                        try {
+                            const chats = await getChats(token);
+                            setChats(chats);
+                        } catch (err) {
+                            console.error('Error fetching chats:', err);
+                        }
+                    };
+                    fetchChats();
                 }
                 return prevMessages;
             });
         });
     
-        socket.on('message_sent', (message: Message) => {
+        socket.on('message_sent', (message: PopulatedMessage) => {
             debugMessageFlow('message_sent', message);
             setMessages(prevMessages => {
                 const currentChat = chatRef.current;
-                if(message.chatId === currentChat?._id) {
+                //if the message is for the current chat or the current chat is a temp chat and the message is for the same participants
+                if(message.chatId._id === currentChat?._id || (currentChat?._id === 'temp' && message.chatId.participants.every(participant => currentChat?.participants.some(p => p._id === participant._id)))) {
                     if(!prevMessages.some(m => m._id === message._id)) {
                         console.log('Adding sent message to current chat:', message.content.substring(0, 50));
-                        return [...prevMessages, message];
+                        if(currentChat?._id === 'temp') { //if we dont have the chat yet, set it before returning
+                            console.log('setting chat to', message.chatId);
+                            setChat(message.chatId);
+                        }
+                        return [...prevMessages, populatedMessageToMessage(message)];
                     } else {
                         console.log('Sent message already exists, skipping:', message._id);
                     }
+                    console.log('currentChat?._id', currentChat?._id);
+                    if(currentChat?._id === 'temp') { //TODO: remove?
+                        console.log('setting chat to', message.chatId);
+                        setChat(message.chatId);
+                        //chats should be fetched in the useEffect that depends on chat because chat is changed here
+                    }
                 } else {
                     console.log('Sent message not for current chat, ignoring:', message.chatId, 'vs', currentChat?._id);
+                    //refetch chats, in case the chat is not open yet thus the chat will be undefined and not temp
+                    const fetchChats = async () => {
+                        if(!token) return;
+                        try {
+                            const chats = await getChats(token);
+                            setChats(chats);
+                        } catch (err) {
+                            console.error('Error fetching chats:', err);
+                        }
+                    };
+                    fetchChats();
                 }
                 return prevMessages;
             });
@@ -259,7 +328,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     const chatWith = (friend: User) => {
-        const existingChat = chats.find(chat => chat.participants.some(participant => participant._id === friend.id));
+        const existingChat = chatsRef.current.find(chat => chat.participants.some(participant => participant._id === friend.id)); //using ref to avoid stale closure
+        console.log('chatsRef.current', chatsRef.current);
+        console.log('friend.id', friend.id);
         console.log('chat', existingChat);
         
         //check if this is the same chat as currently selected
@@ -268,7 +339,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         if (!existingChat) {
             const newChat = { //create a temp chat for new conversation
                 _id: 'temp',
-                participants: [{_id: friend.id, username: friend.username, email: friend.email, avatar: 'none'}],
+                participants: [{_id: friend.id || '', username: friend.username, email: friend.email, avatar: 'none'}, {_id: userId || '', username: '', email: '', avatar: 'none'}],
                 messageCount: 0,
                 createdAt: new Date(),
                 updatedAt: new Date()
@@ -294,6 +365,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         chatRef.current = chat;
         console.log('chat changed', chat);
     }, [chat]);
+
+    useEffect(() => {
+        chatsRef.current = chats;
+        console.log('chats changed', chats);
+    }, [chats]);
 
     useEffect(() => {
         if(!chat) return;
@@ -329,6 +405,22 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             } : null
         });
     };
+
+    //internal
+    const populatedMessageToMessage = (populatedMessage: PopulatedMessage): Message => {
+        return {
+            _id: populatedMessage._id,
+            chatId: populatedMessage.chatId._id,
+            content: populatedMessage.content,
+            sender: populatedMessage.sender,
+            messageType: populatedMessage.messageType,
+            readBy: populatedMessage.readBy,
+            edited: populatedMessage.edited,
+            editedAt: populatedMessage.editedAt,
+            createdAt: populatedMessage.createdAt,
+            updatedAt: populatedMessage.updatedAt
+        }
+    }
 
     return <ChatContext.Provider value={{ chats, setChats, chat, selectChat, chatWith, messages, setMessages, typing, setTyping, otherIsTyping, setOtherIsTyping, isLoading, setIsLoading, error, setError, isOpen, setIsOpen, sendMessage }}>{children}</ChatContext.Provider>;
 }
