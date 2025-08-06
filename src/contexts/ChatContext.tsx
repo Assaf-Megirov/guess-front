@@ -63,6 +63,10 @@ interface ChatContextType {
     chatWith: (friend: User) => void;
     messages: Message[]; //the messages in the current chat
     setMessages: (messages: Message[]) => void;
+    typing: boolean;
+    setTyping: (typing: boolean) => void;
+    otherIsTyping: boolean;
+    setOtherIsTyping: (otherIsTyping: boolean) => void;
     isLoading: boolean;
     setIsLoading: (isLoading: boolean) => void;
     error: any;
@@ -78,6 +82,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     const [chats, setChats] = useState<Chat[]>([]);
     const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [typing, setTyping] = useState(false);
+    const [otherIsTyping, setOtherIsTyping] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<any>(null);
     const [isOpen, setIsOpen] = useState(true);
@@ -191,6 +197,23 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 return prevMessages;
             });
         });
+
+        socket.on('friend_typing', (data: { userId: string }) => {
+            console.log('friend_typing', data.userId);
+            console.log('chatRef.current', chatRef.current);
+            console.log('chatRef.current?.participants.find(participant => participant._id !== userId)?._id', chatRef.current?.participants.find(participant => participant._id !== userId)?._id);
+
+            if(data.userId === chatRef.current?.participants.find(participant => participant._id !== userId)?._id) {
+                setOtherIsTyping(true);
+            }
+        });
+
+        socket.on('friend_stopped_typing', (data: { userId: string }) => {
+            console.log('friend_stopped_typing', data.userId);
+            if(data.userId === chatRef.current?.participants.find(participant => participant._id !== userId)?._id) {
+                setOtherIsTyping(false);
+            }
+        });
     
         socketRef.current = socket;
     
@@ -267,13 +290,31 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setIsOpen(true);
     }
 
-    // Update chatRef whenever chat changes
     useEffect(() => {
         chatRef.current = chat;
         console.log('chat changed', chat);
     }, [chat]);
 
-    // Debug function to track message flow
+    useEffect(() => {
+        if(!chat) return;
+        if(typing) {
+            socketRef.current?.emit('typing_start', {
+                //TODO: consider memoizing the friendId
+                friendId: chat?.participants.find(participant => participant._id !== userId)?._id,
+            });
+        } else {
+            socketRef.current?.emit('typing_stop', {
+                friendId: chat?.participants.find(participant => participant._id !== userId)?._id,
+            });
+        }
+
+        return () => {
+            socketRef.current?.emit('typing_stop', {
+                friendId: chat?.participants.find(participant => participant._id !== userId)?._id,
+            });
+        }
+    }, [typing]);
+
     const debugMessageFlow = (action: string, message?: any) => {
         const currentChat = chatRef.current;
         console.log(`[DEBUG] ${action}:`, {
@@ -289,7 +330,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         });
     };
 
-    return <ChatContext.Provider value={{ chats, setChats, chat, selectChat, chatWith, messages, setMessages, isLoading, setIsLoading, error, setError, isOpen, setIsOpen, sendMessage }}>{children}</ChatContext.Provider>;
+    return <ChatContext.Provider value={{ chats, setChats, chat, selectChat, chatWith, messages, setMessages, typing, setTyping, otherIsTyping, setOtherIsTyping, isLoading, setIsLoading, error, setError, isOpen, setIsOpen, sendMessage }}>{children}</ChatContext.Provider>;
 }
 
 export const useChat = () => {

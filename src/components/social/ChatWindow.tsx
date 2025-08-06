@@ -4,12 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
 const ChatWindow: React.FC = () => {
-    const { chat, messages, sendMessage, isOpen, setIsOpen } = useChat();
+    const { chat, messages, sendMessage, isOpen, setIsOpen, typing, setTyping, otherIsTyping } = useChat();
     const { user, isAuthenticated } = useAuth();
     const [messageText, setMessageText] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatWindowRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [position, setPosition] = useState({ x: 20, y: 20 });
+    const typingTimer = useRef<NodeJS.Timeout | null>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -26,8 +28,31 @@ const ChatWindow: React.FC = () => {
         }
     };
 
+    const handleInput = (e: React.FormEvent<HTMLInputElement>) => {
+        const text = e.currentTarget.value;
+        if (text.trim()) {
+          if (!typing) {
+            setTyping(true);
+          }
+
+          typingTimer.current && clearTimeout(typingTimer.current);
+          typingTimer.current = setTimeout(() => {
+            setTyping(false);
+          }, 1000);
+        } else if (typing) {
+          setTyping(false); //if there was a change and it is empty, stop typing
+        }
+      };
+    
+      useEffect(() => {
+        return () => { //clear the timer when the component unmounts
+          typingTimer.current && clearTimeout(typingTimer.current);
+        };
+      }, []);
+
     const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        //if enter key is pressed and shift key is not pressed, and the chat window is in focus, send the message
+        if (e.key === 'Enter' && !e.shiftKey && chatWindowRef.current?.contains(document.activeElement)) {
             e.preventDefault();
             handleSendMessage();
         }
@@ -187,6 +212,7 @@ const ChatWindow: React.FC = () => {
     const otherParticipant = chat.participants.find(p => p._id !== user?.id);
     return (
         <div 
+            ref={chatWindowRef}
             className="fixed bottom-4 right-4 w-80 h-96 bg-white rounded-lg shadow-2xl border border-gray-200 flex flex-col z-50"
             style={{
                 transform: `translate(${position.x}px, ${position.y}px)`,
@@ -200,7 +226,7 @@ const ChatWindow: React.FC = () => {
             >
                 <div className="flex items-center space-x-2">
                     <div className="relative">
-                        {otherParticipant?.avatar ? (
+                        {otherParticipant?.avatar && otherParticipant.avatar !== 'none' ? (
                             <img 
                                 src={otherParticipant.avatar} 
                                 alt="Avatar" 
@@ -216,6 +242,9 @@ const ChatWindow: React.FC = () => {
                         <div className="text-xs opacity-75">Online</div>
                     </div>
                 </div>
+                {otherIsTyping && (
+                    <div className="text-xs opacity-75">Typing...</div>
+                )}
                 <button 
                     onClick={() => setIsOpen(false)}
                     className="text-white hover:text-gray-200 transition-colors"
@@ -267,7 +296,8 @@ const ChatWindow: React.FC = () => {
                         type="text"
                         value={messageText}
                         onChange={(e) => setMessageText(e.target.value)}
-                        onKeyPress={handleKeyPress}
+                        onKeyDown={handleKeyPress}
+                        onInput={handleInput}
                         placeholder="Type a message..."
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
