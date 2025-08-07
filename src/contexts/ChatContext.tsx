@@ -158,6 +158,14 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 if (isMounted && chatRef.current?._id === currentChatId) {
                     console.log('Setting messages for chat:', currentChatId, 'count:', incomingMessages.length);
                     setMessages(incomingMessages);
+                    console.log('incomingMessages', incomingMessages);
+                    const unreadMessages = incomingMessages.filter(
+                        (message: Message) => message.sender._id !== userId && 
+                        !message.readBy.some((read: { user: { _id: string } }) => read.user._id === userId)
+                    );
+                    if (unreadMessages.length > 0) {
+                        markMessagesAsRead(token, unreadMessages);
+                    }
                 } else {
                     console.log('Chat changed during fetch, discarding messages for:', currentChatId);
                 }
@@ -390,6 +398,21 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             });
         }
     }, [typing]);
+
+    const markMessagesAsRead = async (token: string, messages: Message[]) => {
+        console.log('markMessagesAsRead is called');
+        if(!token) return;
+        if(!messages) return;
+        console.log('marking messages as read', messages);
+        for(const message of messages) {
+            if(message.sender._id !== userId) {
+                console.log('marking message as read', message._id);
+                socketRef.current?.emit('mark_message_as_read', {
+                    messageId: message._id
+                });
+            }
+        }
+    }
 
     const debugMessageFlow = (action: string, message?: any) => {
         const currentChat = chatRef.current;

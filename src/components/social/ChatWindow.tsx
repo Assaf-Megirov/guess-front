@@ -408,13 +408,22 @@ const ChatWindow: React.FC = () => {
                                                 }`}
                                             >
                                                 <div className="text-sm">{message.content}</div>
-                                                <div className={`text-xs mt-1 ${
-                                                    isOwnMessage ? 'text-blue-100' : 'text-gray-500'
-                                                }`}>
-                                                    {new Date(message.createdAt).toLocaleTimeString([], { 
-                                                        hour: '2-digit', 
-                                                        minute: '2-digit' 
-                                                    })}
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`text-xs ${
+                                                        isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+                                                    }`}>
+                                                        {new Date(message.createdAt).toLocaleTimeString([], { 
+                                                            hour: '2-digit', 
+                                                            minute: '2-digit' 
+                                                        })}
+                                                    </div>
+                                                    {/* Read by */}
+                                                    <div className="text-xs text-black">
+                                                        {/* if the message is read by the other user, show the read by */}
+                                                        {message.sender._id === user?.id ? (
+                                                            message.readBy.some(reader => reader.user._id === chat?.participants.find(p => p._id !== user?.id)?._id) ? '✓✓' : '✓'
+                                                        ) : null}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -462,9 +471,6 @@ const ChatWindow: React.FC = () => {
                                 onClick={() => setShowSidebar(true)}
                                 className="inline-flex items-center px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
                             >
-                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                                </svg>
                                 View Friends
                             </button>
                         </div>

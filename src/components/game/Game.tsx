@@ -90,7 +90,11 @@ const Game: React.FC = () => {
   const handleGameStateChange = (data: GameState) => { //sets rankChanges and players[]
     console.log('Game state changed');
     //only change the time if the difference between the frontend game timer and the truth is greater than 1 second
-    if(Math.abs(gameData?.elapsedTime || 0 - time) > DEBOUNCE_TIME) {
+    if(Math.abs((gameData?.elapsedTime || 0) - time) > DEBOUNCE_TIME) {
+      console.log('TIMER -- elapsed time', gameData?.elapsedTime || 0);
+      console.log('TIMER -- time', time);
+      console.log('TIMER -- difference', Math.abs((gameData?.elapsedTime || 0) - time));
+      console.log('TIMER -- debounce time', DEBOUNCE_TIME);
       setTime(gameData?.elapsedTime || 0);
     }
     
