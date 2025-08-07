@@ -55,7 +55,10 @@ The game can end in one of 2 ways:
 - [x] Add general unread messages count on the minimised chat button
 - [x] Add message seen indicators
 - [x] Add debounce to the timer (if the difference between the forntend game timer and the truth is too small, dont update it to avoid stuttering)
- 
+
+### Known issues
+- Status: Failed to reproduce; Description: Friends not showing up after loggin out and logging in again even though the friendship exists in the DB. 
+
 ## Structure
 
 Most of the logic is encapsulated in the contexts, or at least should be.
