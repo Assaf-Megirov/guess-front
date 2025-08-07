@@ -51,6 +51,7 @@ export interface Chat {
         timestamp: Date;
     };
     messageCount: number;
+    unreadCount: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -137,7 +138,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             }
         }
         fetchChats();
-    }, [token, chat]);
+    }, [token]);
 
     useEffect(() => {
         //whenever the current chat changes, we need to fetch the messages
@@ -209,6 +210,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                             console.log('setting chat to', message.chatId);
                             setChat(message.chatId);
                         }
+                        markMessagesAsRead(token, [populatedMessageToMessage(message)]); //mark the message as read as its for the current chat
                         return [...prevMessages, populatedMessageToMessage(message)];
                     } else {
                         console.log('Message already exists, skipping:', message._id);
@@ -291,6 +293,14 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 setOtherIsTyping(false);
             }
         });
+
+        socket.on('message_read', (data: { messageId: string, readBy: string }) => {
+            console.log('message_read', data);
+            //mark the message as read and make sure to trigger a re-render of all clients of the messsages state
+            setMessages(prevMessages => prevMessages.map(message => 
+                message._id === data.messageId ? { ...message, readBy: [...message.readBy, { user: { _id: data.readBy, username: '' }, readAt: new Date() }] } : message
+            ));
+        });
     
         socketRef.current = socket;
     
@@ -349,6 +359,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 _id: 'temp',
                 participants: [{_id: friend.id || '', username: friend.username, email: friend.email, avatar: 'none'}, {_id: userId || '', username: '', email: '', avatar: 'none'}],
                 messageCount: 0,
+                unreadCount: 0,
                 createdAt: new Date(),
                 updatedAt: new Date()
             }
@@ -399,17 +410,34 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         }
     }, [typing]);
 
+    //TODO: this function assumes that the messages are all from the same chat, either enforece this or make it more robust
     const markMessagesAsRead = async (token: string, messages: Message[]) => {
         console.log('markMessagesAsRead is called');
         if(!token) return;
         if(!messages) return;
         console.log('marking messages as read', messages);
+        let markedMessagesNumber = 0;
         for(const message of messages) {
-            if(message.sender._id !== userId) {
+            //if the message is not from the user and not read by the user, mark it as read
+            if(message.sender._id !== userId && !message.readBy.some((read: { user: { _id: string } }) => read.user._id === userId)) {
                 console.log('marking message as read', message._id);
                 socketRef.current?.emit('mark_message_as_read', {
                     messageId: message._id
                 });
+                //because we checked in the if statement, we know that the message is not read by the user, therefore we decrement the unread count
+                markedMessagesNumber++;
+            }
+        }
+        if(messages.length > 0) {
+            const chat = chatsRef.current.find(chat => chat._id === messages[0].chatId); // the chat that we assume all of the messages in the array are from
+            if(chat) {
+                setChats(prevChats => prevChats.map(c => 
+                    c._id === chat._id 
+                        ? { ...c, unreadCount: Math.max(0, c.unreadCount - markedMessagesNumber) }
+                        : c
+                ));
+            } else {
+                console.error('Couldn\'t find chat to update unread count for marked messages: ', messages);
             }
         }
     }

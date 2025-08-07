@@ -137,16 +137,23 @@ const ChatWindow: React.FC = () => {
         console.log("chats in chat window", chats);
     }, [chats]);
 
+    const totalUnreadCount = chats.reduce((total, chat) => total + chat.unreadCount, 0);
+
     if (!isOpen) { //chat is closed
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-4 right-4 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 z-50"
+                className="fixed bottom-4 right-4 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 z-50 relative"
                 title="Open Chat"
             >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
+                {totalUnreadCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold border-2 border-white">
+                        {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                    </div>
+                )}
             </button>
         );
     }
@@ -216,7 +223,7 @@ const ChatWindow: React.FC = () => {
     const friendsWithChats = getFriendsWithChats();
     const friendsWithoutChats = getFriendsWithoutChats();
 
-    const renderFriendItem = (friend: User, hasChat: boolean = false) => (
+    const renderFriendItem = (friend: User, hasChat: boolean = false, unreadMessageCount: number = 0) => (
         <div
             key={friend.id}
             onClick={() => handleFriendClick(friend)}
@@ -233,7 +240,8 @@ const ChatWindow: React.FC = () => {
                     <div className="w-8 h-8 rounded-full bg-black"></div>
                 )}
                 {hasChat && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white"></div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white">
+                    </div>  
                 )}
             </div>
             <div className="ml-3 flex-1 min-w-0">
@@ -241,7 +249,11 @@ const ChatWindow: React.FC = () => {
                     {friend.username}
                 </div>
                 <div className="text-xs text-gray-500">
-                    {hasChat ? 'Active chat' : 'Start chatting'}
+                    {hasChat ? (
+                        unreadMessageCount > 0 ? 
+                            `${unreadMessageCount} unread message${unreadMessageCount > 1 ? 's' : ''}` : 
+                            'Active chat'
+                    ) : 'Start chatting'}
                 </div>
             </div>
         </div>
@@ -273,7 +285,7 @@ const ChatWindow: React.FC = () => {
                                 <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50">
                                     ACTIVE CHATS ({friendsWithChats.length})
                                 </div>
-                                {friendsWithChats.map(friend => renderFriendItem(friend, true))}
+                                {friendsWithChats.map(friend => renderFriendItem(friend, true, chats.find(chat => chat.participants.some(participant => participant._id === friend.id))?.unreadCount || 0))}
                             </div>
                         )}
                         

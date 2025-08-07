@@ -51,8 +51,9 @@ The game can end in one of 2 ways:
 ## TODO List
 - [x] Add typing indicators
 - [x] Add a sidebar in the chat window that shows all of the chats
-  - [ ] Add individual unread messages counts in this sidebar
-- [ ] Add general unread messages count on the minimised chat button
+  - [x] Add individual unread messages counts in this sidebar
+- [x] Add general unread messages count on the minimised chat button
+- [x] Add message seen indicators
 - [x] Add debounce to the timer (if the difference between the forntend game timer and the truth is too small, dont update it to avoid stuttering)
  
 ## Structure
